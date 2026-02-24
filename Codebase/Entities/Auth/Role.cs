@@ -1,0 +1,6 @@
+﻿namespace Codebase.Entities.Auth;
+
+public class Role:BaseEntity
+{
+    public String name { get; set; }
+}
