@@ -9,10 +9,10 @@ namespace Codebase.Utils;
 public static class RedisUtil
 {
     // Cache lại các Property để tránh dùng Reflection quá nhiều gây chậm (Performance cực quan trọng cho Session)
-    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> _propertyCache = new();
+    private static readonly ConcurrentDictionary<Type, PropertyInfo[]> PropertyCache = new();
 
     // Tận dụng DataUtil._options đã cấu hình Strict Mode từ trước
-    private static readonly JsonSerializerOptions _options = new()
+    private static readonly JsonSerializerOptions Options = new()
     {
         PropertyNameCaseInsensitive = false,
         PropertyNamingPolicy = null
@@ -66,7 +66,7 @@ public static class RedisUtil
             DateTime dt => dt.ToBinary(),
             // DateTimeOffset: Lưu dạng chuỗi ISO 8601 ("o") để giữ nguyên múi giờ và độ chính xác
             DateTimeOffset dto => dto.ToString("o"),
-            _ => JsonSerializer.Serialize(obj, _options)
+            _ => JsonSerializer.Serialize(obj, Options)
         };
     }
 
@@ -88,10 +88,9 @@ public static class RedisUtil
         T obj,
         TimeSpan? expiry = null) where T : class
     {
-        if (obj == null) return;
 
         // Lấy danh sách Property từ Cache
-        var properties = _propertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
+        var properties = PropertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
 
         var entries = new HashEntry[properties.Length];
 
@@ -118,7 +117,7 @@ public static class RedisUtil
         if (entries.Length == 0) return null;
 
         var obj = new T();
-        var properties = _propertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
+        var properties = PropertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
 
         // Tối ưu: Dùng dictionary để lookup nhanh hơn
         var dict = entries.ToDictionary(e => e.Name.ToString(), e => e.Value);
@@ -150,11 +149,11 @@ public static class RedisUtil
         if (type == typeof(DateTime)) return DateTime.FromBinary((long)val);
 
         if (type == typeof(DateTimeOffset))
-            return DateTimeOffset.Parse(val.ToString()!, null, DateTimeStyles.RoundtripKind);
+            return DateTimeOffset.Parse(val.ToString(), null, DateTimeStyles.RoundtripKind);
 
         // Xử lý JSON cho các kiểu phức tạp (List, Object lồng)
         ReadOnlySpan<byte> span = ((ReadOnlyMemory<byte>)val).Span;
-        return JsonSerializer.Deserialize(span, type, _options);
+        return JsonSerializer.Deserialize(span, type, Options);
     }
 
     // 2. Hàm Deserialize Generic (Vẫn giữ để dùng cho các chỗ khác như GetFieldAsync)
@@ -163,5 +162,36 @@ public static class RedisUtil
         return (T)Deserialize(val, typeof(T))!;
     }
 
+    /// <summary>
+    /// Set toàn bộ object thành JSON Blob (Redis String)
+    /// </summary>
+    public static async Task SetObjectAsJsonAsync<T>(
+        IDatabase db,
+        string key,
+        T obj,
+        TimeSpan expiry)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(obj, Options);
+
+        await db.StringSetAsync(
+            key,
+            bytes,
+            expiry
+        );
+    }
+
+    /// <summary>
+    /// Get toàn bộ object từ JSON Blob (Redis String)
+    /// </summary>
+    public static async Task<T?> GetObjectFromJsonAsync<T>(
+        IDatabase db,
+        string key)
+    {
+        var val = await db.StringGetAsync(key);
+        if (val.IsNullOrEmpty) return default;
+
+        ReadOnlySpan<byte> span = ((ReadOnlyMemory<byte>)val).Span;
+        return JsonSerializer.Deserialize<T>(span, Options);
+    }
 
 }

@@ -1,4 +1,4 @@
-﻿using Codebase.Models.Dtos.Auth;
+﻿using Codebase.Models.Dtos.Requests.Auth;
 
 namespace Codebase.Services.Interfaces.Auth;
 

@@ -21,7 +21,7 @@ public sealed class JwtUtil
         _expireMinutes = int.Parse(config["Jwt:ExpireMinutes"] ?? "1440"); // Mặc định 1 ngày
     }
 
-    public string GenerateToken(Guid userId, string username, string roleIds, LanguageEnum lang)
+    public string GenerateToken(Guid userId, string username , LanguageEnum lang)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -36,7 +36,6 @@ public sealed class JwtUtil
         {
             [JwtRegisteredClaimNames.Sub] = userId.ToString(),      // UserId
             [JwtRegisteredClaimNames.UniqueName] = username,        // Username
-            ["roleIds"] = roleIds,                         // Custom claim cho RoleId
             ["lang"] = lang                                         // Ngôn ngữ ưu tiên
         };
 

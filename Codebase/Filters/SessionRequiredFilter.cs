@@ -2,7 +2,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc.Filters;
 
-namespace Codebase.Filter;
+namespace Codebase.Filters;
 
 public class SessionRequiredFilter : IAuthorizationFilter
 {

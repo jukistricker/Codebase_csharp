@@ -1,4 +1,4 @@
-﻿namespace Codebase.Models.Dtos.Auth;
+﻿namespace Codebase.Models.Dtos.Requests.Auth;
 
 public class SignInDto
 {

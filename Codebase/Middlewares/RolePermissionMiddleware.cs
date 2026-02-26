@@ -1,60 +1,106 @@
-﻿using Codebase.Attributes;
-using Codebase.Models.Dtos.Auth;
-using Codebase.Models.Dtos.Responses.Shared;
-using Codebase.Utils;
-using StackExchange.Redis;
+﻿using Codebase.Models.Dtos.Requests.Auth;
 
 namespace Codebase.Middlewares;
+using Attributes;
+using Models.Dtos.Responses.Shared;
+using Utils;
+using Microsoft.AspNetCore.Authorization;
+using StackExchange.Redis;
 
-public class RolePermissionMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
+public class RolePermissionMiddleware
 {
-    private readonly IDatabase _db = redis.GetDatabase();
+    private readonly RequestDelegate _next;
+    private readonly IDatabase _redis;
+
+    public RolePermissionMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
+    {
+        _next = next;
+        _redis = redis.GetDatabase();
+    }
 
     public async Task Invoke(HttpContext context)
     {
         var endpoint = context.GetEndpoint();
         if (endpoint == null)
         {
-            await next(context);
+            await _next(context);
             return;
         }
 
-        var requiredPermission = endpoint.Metadata.GetMetadata<RequiredPermissionAttribute>()?.Permission;
-        var isAuthorizeOnly = endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.AuthorizeAttribute>() != null;
-        var isAllowAnonymous = endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Authorization.AllowAnonymousAttribute>() != null;
+        // 1. Metadata 
+        var allowAnonymous = endpoint.Metadata
+            .GetMetadata<IAllowAnonymous>() != null;
 
-        if (isAllowAnonymous || (string.IsNullOrEmpty(requiredPermission) && !isAuthorizeOnly))
+        if (allowAnonymous)
         {
-            await next(context);
+            await _next(context);
             return;
         }
 
-        // 1. Lấy Token
-        string authHeader = context.Request.Headers.Authorization.ToString();
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
+        var requiredPermission = endpoint.Metadata
+            .GetMetadata<RequiredPermissionAttribute>()?.Permission;
+
+        var authorizeOnly = endpoint.Metadata
+            .GetMetadata<AuthorizeAttribute>() != null;
+
+        if (string.IsNullOrEmpty(requiredPermission) && !authorizeOnly)
+        {
+            await _next(context);
+            return;
+        }
+
+        //  2. Extract token 
+        if (!context.Request.Headers.TryGetValue("Authorization", out var header) ||
+            !header.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
         {
             await ReturnError(context, ResponseCatalog.Unauthorized);
             return;
         }
-        var token = authHeader["Bearer ".Length..].Trim();
 
-        // 2. MIGRATE: Lấy Session từ Redis Hash
-        // Sử dụng hàm GetObjectFromHashAsync đã tối ưu hóa Reflection
-        var userSession = await RedisUtil.GetObjectFromHashAsync<UserSession>(_db, $"session:{token}");
+        var token = header.ToString()["Bearer ".Length..].Trim();
 
-        if (userSession == null)
+        if (string.IsNullOrEmpty(token))
         {
             await ReturnError(context, ResponseCatalog.Unauthorized);
             return;
         }
 
-        // Gán vào context để dùng ở Controller
-        context.Items["UserSession"] = userSession;
+        //  3. Load session 
+        UserSession? session;
+        try
+        {
+            var redisValue = await _redis.StringGetAsync($"session:{token}");
 
-        // 3. Kiểm tra quyền
+            if (redisValue.IsNullOrEmpty)
+            {
+                await ReturnError(context, ResponseCatalog.Unauthorized);
+                return;
+            }
+
+            session = DataUtil.RedisValueToObject<UserSession>(redisValue);
+
+            if (session == null)
+            {
+                await ReturnError(context, ResponseCatalog.Unauthorized);
+                return;
+            }
+        }
+        catch (RedisException)
+        {
+            // Redis chết, không verify được auth
+            await ReturnError(context, ResponseCatalog.Internal);
+            return;
+        }
+
+        //  4. Attach session 
+        context.Items["UserSession"] = session;
+
+        //  5. Permission check 
         if (!string.IsNullOrEmpty(requiredPermission))
         {
-            var hasPermission = userSession.Permissions?.Contains(requiredPermission) ?? false;
+            var hasPermission =
+                session.Permissions?.Contains(requiredPermission) ?? false;
+
             if (!hasPermission)
             {
                 await ReturnError(context, ResponseCatalog.Forbidden);
@@ -62,14 +108,11 @@ public class RolePermissionMiddleware(RequestDelegate next, IConnectionMultiplex
             }
         }
 
-        await next(context);
+        await _next(context);
     }
-
 
     private static async Task ReturnError(HttpContext context, ResponseCatalog catalog)
     {
-        // Sử dụng ExecuteAsync để trả về DTO chuẩn cho Client
         await ResponseDto.Create(catalog).ExecuteAsync(context);
     }
 }
-

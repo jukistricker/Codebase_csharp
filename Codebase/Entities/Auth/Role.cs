@@ -2,5 +2,5 @@
 
 public class Role:BaseEntity
 {
-    public String name { get; set; }
+    public String Name { get; set; }
 }
