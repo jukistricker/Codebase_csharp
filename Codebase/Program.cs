@@ -48,6 +48,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+app.UsePathBase("/api");
 
 app.UseHttpsRedirection();
 

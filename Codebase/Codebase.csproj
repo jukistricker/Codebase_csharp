@@ -25,7 +25,6 @@
 
   <ItemGroup>
     <Folder Include="Models\Dtos\Requests\" />
-    <Folder Include="Repositories\" />
   </ItemGroup>
 
 </Project>

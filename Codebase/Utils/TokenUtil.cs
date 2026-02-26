@@ -6,14 +6,14 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Codebase.Utils;
 
-public sealed class JwtUtil
+public sealed class TokenUtil
 {
     private readonly string _secretKey;
     private readonly string _issuer;
     private readonly string _audience;
     private readonly int _expireMinutes;
 
-    public JwtUtil(IConfiguration config)
+    public TokenUtil(IConfiguration config)
     {
         _secretKey = config["Jwt:SecretKey"] ?? throw new ArgumentNullException("Jwt SecretKey missing");
         _issuer = config["Jwt:Issuer"] ?? "CodebaseIssuer";

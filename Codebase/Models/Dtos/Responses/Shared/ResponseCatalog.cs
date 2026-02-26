@@ -14,7 +14,6 @@ public sealed class ResponseCatalog
     // ===== 2xx Success =====
     public static readonly ResponseCatalog Success = new(200, "success");
     public static readonly ResponseCatalog Created = new(201, "created");
-    public static readonly ResponseCatalog NoContent = new(204, "no_content");
 
     // ===== 4xx Client Errors (Common) =====
     public static readonly ResponseCatalog BadRequest = new(400, "bad_request");
