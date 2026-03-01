@@ -1,0 +1,47 @@
+﻿services:
+
+  postgres:
+    image: postgres:17
+    container_name: codebase-postgres
+    restart: always
+    env_file:
+      - .env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    networks:
+      - codebase-net
+
+  redis:
+    image: redis:7
+    container_name: codebase-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - codebase-net
+
+  api:
+    build:
+      context: .
+      dockerfile: Codebase/Dockerfile
+    container_name: codebase-api
+    restart: always
+    depends_on:
+      - postgres
+      - redis
+    env_file:
+      - .env
+    environment:
+      ConnectionStrings__DefaultConnection: Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USER};Password=${DB_PASS}
+      Redis__ConnectionString: ${REDIS_HOST}:${REDIS_PORT}
+    ports:
+      - "8080:8080"
+    networks:
+      - codebase-net
+
+networks:
+  codebase-net:

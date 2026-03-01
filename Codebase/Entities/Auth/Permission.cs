@@ -2,5 +2,6 @@
 
 public class Permission:BaseEntity
 {
-    public string Code { get; set; } = null!;
+    public string Code { get; set; }
+    public Guid PermissionGroupId { get; set; }
 }

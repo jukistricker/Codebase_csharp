@@ -2,6 +2,7 @@
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
@@ -28,4 +29,13 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-ENTRYPOINT ["dotnet", "Codebase.dll"]
+# Copy thư mục Migrations vào container để thực thi
+# Đường dẫn trong container sẽ là /app/Migrations
+COPY Codebase/Migrations ./Migrations
+
+# Chuyển quyền thực thi cho script
+USER root
+RUN chmod +x ./Migrations/migrate.sh
+USER $APP_UID
+
+ENTRYPOINT ["/bin/bash", "-c", "./Migrations/migrate.sh && dotnet Codebase.dll"]
