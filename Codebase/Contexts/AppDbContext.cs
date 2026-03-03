@@ -1,5 +1,8 @@
-﻿using Codebase.Entities.Auth;
+﻿using Codebase.Entities;
+using Codebase.Entities.Auth;
+using Codebase.Utils;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace Codebase.Contexts;
 
@@ -12,39 +15,100 @@ public class AppDbContext : DbContext
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<Permission> Permissions => Set<Permission>();
     public DbSet<RolePermission> RolePermissions => Set<RolePermission>();
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.Entity<User>().ToTable("users");
+        modelBuilder.Entity<Role>().ToTable("roles");
+        modelBuilder.Entity<Permission>().ToTable("permissions");
+        modelBuilder.Entity<PermissionGroup>().ToTable("permission_groups");
+        modelBuilder.Entity<UserRole>().ToTable("user_roles");
+        modelBuilder.Entity<RolePermission>().ToTable("role_permissions");
+
+        // Định nghĩa khóa chính tổ hợp cho RolePermission
+        modelBuilder.Entity<RolePermission>()
+            .HasKey(rp => new { rp.RoleId, rp.PermissionId });
+
+        // Định nghĩa khóa chính tổ hợp cho UserRole
+        modelBuilder.Entity<UserRole>()
+            .HasKey(ur => new { ur.UserId, ur.RoleId });
+        
+        
+    }
 
     public override int SaveChanges()
     {
-        ApplyUuidV7();
+        ApplyAuditLog();
         return base.SaveChanges();
     }
 
     public override Task<int> SaveChangesAsync(
         CancellationToken cancellationToken = default)
     {
-        ApplyUuidV7();
+        ApplyAuditLog();
         return base.SaveChangesAsync(cancellationToken);
     }
 
-    private void ApplyUuidV7()
+    private void ApplyAuditLog()
+{
+    var now = DateTimeOffset.UtcNow;
+    var rawUserId = HttpContextUtil.CurrentUserId; // chuỗi string từ token
+
+    // Chỉ lọc những thực thể kế thừa IAuditEntity
+    foreach (var entry in ChangeTracker.Entries<IAuditEntity>())
     {
-        foreach (var entry in ChangeTracker.Entries())
+        // 1. Cập nhật thời gian (Common cho cả Add và Update)
+        entry.Entity.UpdatedAt = now;
+
+        if (entry.State == EntityState.Added)
         {
-            if (entry.State != EntityState.Added)
-                continue;
+            entry.Entity.CreatedAt = now;
 
-            var idProp = entry.Properties
-                .FirstOrDefault(p =>
-                    p.Metadata.Name == "Id" &&
-                    p.Metadata.ClrType == typeof(Guid));
-
-            if (idProp == null)
-                continue;
-
-            if ((Guid)idProp.CurrentValue! == Guid.Empty)
+            // 2. Xử lý ID tự động (Chỉ gán nếu là Guid và đang trống)
+            var idProp = entry.Property("Id");
+            if (idProp.Metadata.ClrType == typeof(Guid) && (Guid)idProp.CurrentValue! == Guid.Empty)
             {
                 idProp.CurrentValue = Guid.CreateVersion7();
             }
+
+            // 3. Gán người tạo/người sửa
+            SetAuditUser(entry, "CreatedBy", rawUserId, true);
+            SetAuditUser(entry, "UpdatedBy", rawUserId, false);
+        }
+        else if (entry.State == EntityState.Modified)
+        {
+            // 4. Chỉ gán người sửa khi cập nhật
+            SetAuditUser(entry, "UpdatedBy", rawUserId, false);
+            
+            // Bảo vệ các trường không cho phép sửa
+            entry.Property("CreatedAt").IsModified = false;
+            entry.Property("CreatedBy").IsModified = false;
         }
     }
+}
+
+private void SetAuditUser(EntityEntry entry, string propName, string? rawUserId, bool isNew)
+{
+    var prop = entry.Property(propName);
+    var targetType = prop.Metadata.ClrType;
+
+    // A. Nếu có Token (User đã đăng nhập)
+    if (!string.IsNullOrEmpty(rawUserId))
+    {
+        // Chuyển đổi linh hoạt sang bất kỳ kiểu dữ liệu nào (Guid, int, long, string)
+        object convertedId = targetType == typeof(Guid) 
+            ? Guid.Parse(rawUserId) 
+            : Convert.ChangeType(rawUserId, targetType);
+            
+        prop.CurrentValue = convertedId;
+    }
+    // B. Nếu không có Token (Trường hợp SignUp)
+    else if (isNew && propName == "CreatedBy")
+    {
+        // Gán CreatedBy = Id của chính bản ghi đó
+        // Cách này hoạt động cho mọi kiểu dữ liệu của Id
+        prop.CurrentValue = entry.Property("Id").CurrentValue;
+    }
+}
 }

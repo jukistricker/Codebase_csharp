@@ -10,7 +10,6 @@ public class SignUpDto
 
     [Required(ErrorMessage = "auth.password_required")]
     public string Password { get; set; } = null!;
-    public HashSet<Guid>? RoleIds { get; set; }
     public LanguageEnum InitLang { get; set; }
 }
 

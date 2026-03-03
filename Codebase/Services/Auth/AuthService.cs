@@ -33,24 +33,10 @@ public class AuthService : IAuthService
 
         HashSet<Guid> roleIds;
 
-        if (dto.RoleIds == null || dto.RoleIds.Count == 0)
-        {
-            var defaultRoleId = await _authRepo.GetDefaultRoleIdAsync();
-            if (defaultRoleId == null)
-                return ResponseDto.Create(ResponseCatalog.BadRequest, "auth.default_role_not_found");
-
-            roleIds = new HashSet<Guid> { defaultRoleId.Value };
-        }
-        else
-        {
-            roleIds = dto.RoleIds.ToHashSet();
-        }
-
-        var existingRoleIds = await _authRepo.GetExistingRoleIdsAsync(roleIds);
-
-        if (existingRoleIds.Count != roleIds.Count)
-            return ResponseDto.Create(ResponseCatalog.BadRequest, "auth.some_role_ids_invalid");
-
+        var defaultRoleId = await _authRepo.GetDefaultRoleIdAsync();
+        if (defaultRoleId == null)
+            return ResponseDto.Create(ResponseCatalog.BadRequest, "auth.default_role_not_found");
+        
         var user = new User
         {
             Id = Guid.CreateVersion7(),
@@ -63,11 +49,13 @@ public class AuthService : IAuthService
         user.UpdatedBy = user.Id;
 
         await _authRepo.AddUserAsync(user);
+        
+        List<UserRole> userRoles=new List<UserRole>();
 
-        var userRoles = existingRoleIds.Select(roleId => new UserRole
+        userRoles.Add(new UserRole
         {
             UserId = user.Id,
-            RoleId = roleId
+            RoleId = defaultRoleId.Value
         });
 
         await _authRepo.AddUserRolesAsync(userRoles);

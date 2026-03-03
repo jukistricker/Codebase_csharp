@@ -1,6 +1,11 @@
 ﻿using Codebase.Contexts;
 using Codebase.Middlewares;
 using Codebase.Models.Dtos.Responses.Shared;
+using Codebase.Repositories;
+using Codebase.Repositories.Interfaces;
+using Codebase.Services.Auth;
+using Codebase.Services.Interfaces.Auth;
+using Codebase.Utils;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
@@ -40,7 +45,22 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddHttpContextAccessor();
+
+// Đăng ký Repository 
+builder.Services.AddScoped<IAuthRepository, AuthRepository>();
+builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+
+// Đăng ký Service
+builder.Services.AddScoped<IAuthService, AuthService>();
+
+//Đăng ký các Unstatic Util
+builder.Services.AddSingleton<TokenUtil>();
+
 var app = builder.Build();
+
+var accessor = app.Services.GetRequiredService<IHttpContextAccessor>();
+HttpContextUtil.Configure(accessor);
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

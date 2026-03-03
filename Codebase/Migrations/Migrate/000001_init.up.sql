@@ -125,3 +125,48 @@ FROM roles r
     )
 WHERE r.name = 'user'
     ON CONFLICT DO NOTHING;
+
+-- =========================================
+-- TẠO USER ADMIN
+-- =========================================
+
+DO $$
+DECLARE
+    v_role_id UUID;
+    v_admin_id UUID; 
+    v_password_hash TEXT := '$2a$11$R9h/lIPzHZ7fJLTMp.p3cOnB.V3pKN8nNM8fWjM9L5W6S8V9Y6uS.';
+BEGIN
+    -- 1. Lấy ID của role 'admin'
+SELECT id INTO v_role_id FROM roles WHERE name = 'admin' LIMIT 1;
+
+-- 2. Chèn User Admin nếu chưa tồn tại
+INSERT INTO users (username, password, lang, created_at, updated_at)
+VALUES (
+           'admin',
+           v_password_hash,
+           1,
+           NOW(),
+           NOW()
+       )
+    ON CONFLICT (username) DO NOTHING;
+
+-- 3. Lấy lại ID thực tế của user 'admin'
+SELECT id INTO v_admin_id FROM users WHERE username = 'admin';
+
+-- 4. Gán Role Admin cho User này
+IF v_role_id IS NOT NULL AND v_admin_id IS NOT NULL THEN
+        INSERT INTO user_roles (user_id, role_id)
+        VALUES (v_admin_id, v_role_id)
+        ON CONFLICT DO NOTHING;
+        
+        -- 5. Cập nhật Audit fields cho chính nó (Self-reference)
+UPDATE users
+SET created_by = v_admin_id, updated_by = v_admin_id
+WHERE id = v_admin_id AND (created_by IS NULL OR created_by = '00000000-0000-0000-0000-000000000000');
+
+RAISE NOTICE 'Admin user initialized with ID: %', v_admin_id;
+ELSE
+        RAISE WARNING 'Could not find Admin Role or Admin User';
+END IF;
+
+END $$;
