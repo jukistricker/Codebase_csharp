@@ -19,12 +19,7 @@ public class AppDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        modelBuilder.Entity<User>().ToTable("users");
-        modelBuilder.Entity<Role>().ToTable("roles");
-        modelBuilder.Entity<Permission>().ToTable("permissions");
-        modelBuilder.Entity<PermissionGroup>().ToTable("permission_groups");
-        modelBuilder.Entity<UserRole>().ToTable("user_roles");
-        modelBuilder.Entity<RolePermission>().ToTable("role_permissions");
+        
 
         // Định nghĩa khóa chính tổ hợp cho RolePermission
         modelBuilder.Entity<RolePermission>()
@@ -34,7 +29,28 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<UserRole>()
             .HasKey(ur => new { ur.UserId, ur.RoleId });
         
-        
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            // Đổi tên Table: PermissionGroup -> permission_groups
+            // (Lưu ý: EF thường tự thêm 's', nếu SQL của bạn là số ít thì dùng entity.ClrType.Name)
+            var tableName = ToSnakeCase(entity.GetTableName() ?? entity.ClrType.Name);
+            entity.SetTableName(tableName);
+
+            foreach (var property in entity.GetProperties())
+            {
+                // Đổi tên Column: PermissionGroupId -> permission_group_id
+                property.SetColumnName(ToSnakeCase(property.Name));
+            }
+        }
+    }
+    
+    private string ToSnakeCase(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+
+        return string.Concat(input.Select((x, i) =>
+                i > 0 && char.IsUpper(x) ? "_" + x.ToString() : x.ToString()))
+            .ToLower();
     }
 
     public override int SaveChanges()
