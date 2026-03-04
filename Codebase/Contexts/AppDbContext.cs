@@ -32,7 +32,6 @@ public class AppDbContext : DbContext
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
             // Đổi tên Table: PermissionGroup -> permission_groups
-            // (Lưu ý: EF thường tự thêm 's', nếu SQL của bạn là số ít thì dùng entity.ClrType.Name)
             var tableName = ToSnakeCase(entity.GetTableName() ?? entity.ClrType.Name);
             entity.SetTableName(tableName);
 
@@ -89,13 +88,13 @@ public class AppDbContext : DbContext
             }
 
             // 3. Gán người tạo/người sửa
-            SetAuditUser(entry, "CreatedBy", rawUserId, true);
-            SetAuditUser(entry, "UpdatedBy", rawUserId, false);
+            SetAuditUser(entry, "CreatedBy", rawUserId);
+            SetAuditUser(entry, "UpdatedBy", rawUserId);
         }
         else if (entry.State == EntityState.Modified)
         {
             // 4. Chỉ gán người sửa khi cập nhật
-            SetAuditUser(entry, "UpdatedBy", rawUserId, false);
+            SetAuditUser(entry, "UpdatedBy", rawUserId);
             
             // Bảo vệ các trường không cho phép sửa
             entry.Property("CreatedAt").IsModified = false;
@@ -104,7 +103,7 @@ public class AppDbContext : DbContext
     }
 }
 
-private void SetAuditUser(EntityEntry entry, string propName, string? rawUserId, bool isNew)
+private void SetAuditUser(EntityEntry entry, string propName, string? rawUserId)
 {
     var prop = entry.Property(propName);
     var targetType = prop.Metadata.ClrType;
@@ -120,11 +119,11 @@ private void SetAuditUser(EntityEntry entry, string propName, string? rawUserId,
         prop.CurrentValue = convertedId;
     }
     // B. Nếu không có Token (Trường hợp SignUp)
-    else if (isNew && propName == "CreatedBy")
-    {
-        // Gán CreatedBy = Id của chính bản ghi đó
-        // Cách này hoạt động cho mọi kiểu dữ liệu của Id
-        prop.CurrentValue = entry.Property("Id").CurrentValue;
-    }
+    // else if (isNew && propName == "CreatedBy")
+    // {
+    //     // Gán CreatedBy = Id của chính bản ghi đó
+    //     // Cách này hoạt động cho mọi kiểu dữ liệu của Id
+    //     prop.CurrentValue = entry.Property("Id").CurrentValue;
+    // }
 }
 }

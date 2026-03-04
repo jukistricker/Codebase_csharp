@@ -1,4 +1,6 @@
-﻿namespace Codebase.Services.Auth;
+﻿using Codebase.Models.Enums;
+
+namespace Codebase.Services.Auth;
 
 using Entities.Auth;
 using Models.Dtos.Requests.Auth;
@@ -31,12 +33,13 @@ public class AuthService : IAuthService
         if (await _authRepo.UsernameExistsAsync(dto.Username))
             return ResponseDto.Create(ResponseCatalog.Conflict, "auth.username_exists");
 
-        HashSet<Guid> roleIds;
-
         var defaultRoleId = await _authRepo.GetDefaultRoleIdAsync();
         if (defaultRoleId == null)
             return ResponseDto.Create(ResponseCatalog.BadRequest, "auth.default_role_not_found");
-        
+        if (dto.InitLang != LanguageEnum.En)
+        {
+            dto.InitLang = LanguageEnum.Vi;
+        }
         var user = new User
         {
             Id = Guid.CreateVersion7(),
@@ -44,20 +47,21 @@ public class AuthService : IAuthService
             Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
             Lang = dto.InitLang
         };
-
+        
         user.CreatedBy = user.Id;
         user.UpdatedBy = user.Id;
-
-        await _authRepo.AddUserAsync(user);
         
-        List<UserRole> userRoles=new List<UserRole>();
-
-        userRoles.Add(new UserRole
+        UserRole newUserRole = new UserRole
         {
             UserId = user.Id,
             RoleId = defaultRoleId.Value
-        });
+        };
+        
+        List<UserRole> userRoles=new List<UserRole>();
 
+        userRoles.Add(newUserRole);
+        
+        await _authRepo.AddUserAsync(user);
         await _authRepo.AddUserRolesAsync(userRoles);
         await _authRepo.SaveChangesAsync();
 
