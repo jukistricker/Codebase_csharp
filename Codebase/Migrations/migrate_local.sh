@@ -47,24 +47,23 @@ if ! command -v psql >/dev/null 2>&1; then
     exit 1
 fi
 
-SQL_DIR="$SCRIPT_DIR/Rollback"
+SQL_DIR="$SCRIPT_DIR/Migrate"
 
 if [ ! -d "$SQL_DIR" ]; then
-    echo -e "\e[31m[ERROR] Thu muc Rollback khong ton tai: $SQL_DIR\e[0m"
+    echo -e "\e[31m[ERROR] Thu muc SQL khong ton tai: $SQL_DIR\e[0m"
     exit 1
 fi
 
 export PGPASSWORD="$DB_PASS"
 
-echo -e "\e[33m--- Starting Rollback on $DB_HOST ($DB_NAME) ---\e[0m"
+echo -e "\e[32m--- Starting Migration to $DB_HOST ($DB_NAME) ---\e[0m"
 
-# Lấy file SQL theo thứ tự ngược
-mapfile -t files < <(ls "$SQL_DIR"/*.sql 2>/dev/null | sort -r)
+mapfile -t files < <(ls "$SQL_DIR"/*.sql 2>/dev/null | sort)
 
 for file in "${files[@]}"; do
     filename=$(basename "$file")
 
-    echo -e "\e[36mRolling back: $filename\e[0m"
+    echo -e "\e[36mApplying: $filename\e[0m"
 
     psql \
         -h "$DB_HOST" \
@@ -83,4 +82,4 @@ done
 
 unset PGPASSWORD
 
-echo -e "\e[32mROLLBACK SUCCESSFUL!\e[0m"
+echo -e "\e[32mMIGRATION SUCCESSFUL!\e[0m"

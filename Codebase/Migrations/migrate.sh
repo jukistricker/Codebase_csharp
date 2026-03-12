@@ -1,32 +1,30 @@
 #!/bin/bash
 set -e 
 
-# Đợi Postgres sẵn sàng bằng công cụ pg_isready có sẵn trong postgresql-client
-echo ">>> Waiting for Postgres to be ready..."
+# Lấy đường dẫn tuyệt đối đến thư mục chứa script này
+PARENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SQL_DIR="$PARENT_DIR/Migrate"
+
+echo ">>> Checking Postgres status at $DB_HOST:$DB_PORT..."
+
+# Đợi DB sẵn sàng
 until pg_isready -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER"; do
-  echo ">>> Postgres is unavailable - sleeping"
+  echo ">>> Postgres is starting up - waiting 2s..."
   sleep 2
 done
 
-echo ">>> Postgres is up - starting migrations..."
-# Di chuyển vào đúng thư mục chứa script để đảm bảo đường dẫn tương đối tới ./Migrate hoạt động
-cd "$(dirname "$0")"
+echo ">>> Postgres is ready! Starting Migrations from $SQL_DIR..."
 
-SQL_DIR="./Migrate"
-
-# Kiểm tra thư mục có tồn tại không
+# Kiểm tra thư mục SQL
 if [ ! -d "$SQL_DIR" ]; then
-  echo "Error: Directory $SQL_DIR not found."
+  echo ">>> Error: Directory $SQL_DIR not found!"
   exit 1
 fi
 
-FILES=$(ls $SQL_DIR/*.sql | sort)
-
-echo ">>> Starting Migrations..."
-for f in $FILES
-do
-  echo ">>> Applying: $f"
-  # Sử dụng các biến env được truyền từ docker-compose
-  PGPASSWORD=$POSTGRES_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $POSTGRES_USER -d $POSTGRES_DB -f $f
+# Chạy từng file SQL theo thứ tự bảng chữ cái
+for f in $(ls "$SQL_DIR"/*.sql | sort); do
+  echo ">>> Applying: $(basename "$f")"
+  PGPASSWORD=$POSTGRES_PASSWORD psql -h "$DB_HOST" -p "$DB_PORT" -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f "$f"
 done
-echo ">>> Migrations completed successfully."
+
+echo ">>> All migrations applied successfully. Launching App..."

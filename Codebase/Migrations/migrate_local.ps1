@@ -1,4 +1,4 @@
-﻿Set-Location $PSScriptRoot
+Set-Location $PSScriptRoot
 $env:PGCLIENTENCODING = 'utf8'
 
 $envPath = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../../.env"))
@@ -49,35 +49,24 @@ if (-not (Get-Command psql -ErrorAction SilentlyContinue)) {
     exit
 }
 
-$SQL_DIR = Join-Path $PSScriptRoot "Rollback"
+$SQL_DIR = Join-Path $PSScriptRoot "Migrate"
 if (-not (Test-Path $SQL_DIR)) {
-    Write-Host "[ERROR] Thu muc Rollback khong ton tai: $SQL_DIR" -ForegroundColor Red
+    Write-Host "[ERROR] Thu muc SQL khong ton tai: $SQL_DIR" -ForegroundColor Red
     pause
     exit
 }
 
 $env:PGPASSWORD = $DB_PASS
+$files = Get-ChildItem -Path $SQL_DIR -Filter *.sql | Sort-Object Name
 
-# Lấy file SQL và chạy NGƯỢC thứ tự
-$files = Get-ChildItem -Path $SQL_DIR -Filter *.sql | Sort-Object Name -Descending
-
-Write-Host "--- Starting Rollback on $DB_HOST ($DB_NAME) ---" -ForegroundColor Yellow
+Write-Host "--- Starting Migration to $DB_HOST ($DB_NAME) ---" -ForegroundColor Green
 
 foreach ($file in $files) {
     $fileName = $file.Name
     $filePath = $file.FullName
-
-    Write-Host "Rolling back: $fileName" -ForegroundColor Cyan
+    Write-Host "Applying: $fileName" -ForegroundColor Cyan
     
-    $psqlArgs = @(
-        "-h", $DB_HOST,
-        "-p", $DB_PORT,
-        "-U", $DB_USER,
-        "-d", $DB_NAME,
-        "-v", "ON_ERROR_STOP=1",
-        "-f", $filePath
-    )
-
+    $psqlArgs = @("-h", $DB_HOST, "-p", $DB_PORT, "-U", $DB_USER, "-d", $DB_NAME, "-v", "ON_ERROR_STOP=1", "-f", $filePath)
     & psql @psqlArgs
     
     if ($LASTEXITCODE -ne 0) { 
@@ -89,4 +78,4 @@ foreach ($file in $files) {
 }
 
 $env:PGPASSWORD = $null
-Write-Host "ROLLBACK SUCCESSFUL!" -ForegroundColor Green
+Write-Host "MIGRATION SUCCESSFUL!" -ForegroundColor Green
