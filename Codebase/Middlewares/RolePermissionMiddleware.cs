@@ -11,100 +11,80 @@ public class RolePermissionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly IDatabase _redis;
+    private readonly TokenUtil _tokenUtil; // Đã là Singleton/Scoped tùy DI của bạn
 
-    public RolePermissionMiddleware(RequestDelegate next, IConnectionMultiplexer redis)
+    public RolePermissionMiddleware(RequestDelegate next, IConnectionMultiplexer redis, TokenUtil tokenUtil)
     {
         _next = next;
         _redis = redis.GetDatabase();
+        _tokenUtil = tokenUtil;
     }
 
     public async Task Invoke(HttpContext context)
     {
         var endpoint = context.GetEndpoint();
-        if (endpoint == null)
+        if (endpoint == null) { await _next(context); return; }
+
+        // 1. Kiểm tra Metadata (Anonymous/No Auth) 
+        if (endpoint.Metadata.GetMetadata<IAllowAnonymous>() != null)
         {
-            await _next(context);
-            return;
+            await _next(context); return;
         }
 
-        // 1. Metadata 
-        var allowAnonymous = endpoint.Metadata
-            .GetMetadata<IAllowAnonymous>() != null;
+        var requiredPermission = endpoint.Metadata.GetMetadata<RequiredPermissionAttribute>()?.Permission;
+        var isAuthorizeOnly = endpoint.Metadata.GetMetadata<AuthorizeAttribute>() != null;
 
-        if (allowAnonymous)
+        if (string.IsNullOrEmpty(requiredPermission) && !isAuthorizeOnly)
         {
-            await _next(context);
-            return;
+            await _next(context); return;
         }
 
-        var requiredPermission = endpoint.Metadata
-            .GetMetadata<RequiredPermissionAttribute>()?.Permission;
-
-        var authorizeOnly = endpoint.Metadata
-            .GetMetadata<AuthorizeAttribute>() != null;
-
-        if (string.IsNullOrEmpty(requiredPermission) && !authorizeOnly)
+        // 2. Extract Token
+        if (!context.Request.Headers.TryGetValue("Authorization", out var header))
         {
-            await _next(context);
-            return;
-        }
-
-        //  2. Extract token 
-        if (!context.Request.Headers.TryGetValue("Authorization", out var header) ||
-            !header.ToString().StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase))
-        {
-            await ReturnError(context, ResponseCatalog.Unauthorized);
-            return;
+            await ReturnError(context, ResponseCatalog.Unauthorized); return;
         }
 
         var token = header.ToString()["Bearer ".Length..].Trim();
+        if (string.IsNullOrEmpty(token)) { await ReturnError(context, ResponseCatalog.Unauthorized); return; }
 
-        if (string.IsNullOrEmpty(token))
+        // 3. CHẶN SỚM 
+        
+        // Bước 3.1: Read JTI (Chỉ parse chuỗi, không tính toán chữ ký)
+        var jti = _tokenUtil.GetJti(token); 
+        if (string.IsNullOrEmpty(jti))
         {
-            await ReturnError(context, ResponseCatalog.Unauthorized);
-            return;
+            await ReturnError(context, ResponseCatalog.Unauthorized); return;
         }
 
-        //  3. Load session 
-        UserSession? session;
-        try
+        // Bước 3.2: Check Redis bằng JTI 
+        var redisValue = await _redis.StringGetAsync($"session:{jti}");
+        if (redisValue.IsNullOrEmpty)
         {
-            var redisValue = await _redis.StringGetAsync($"session:{token}");
-
-            if (redisValue.IsNullOrEmpty)
-            {
-                await ReturnError(context, ResponseCatalog.Unauthorized);
-                return;
-            }
-
-            session = DataUtil.RedisValueToObject<UserSession>(redisValue);
-
-            if (session == null)
-            {
-                await ReturnError(context, ResponseCatalog.Unauthorized);
-                return;
-            }
-        }
-        catch (RedisException)
-        {
-            // Redis chết, không verify được auth
-            await ReturnError(context, ResponseCatalog.Internal);
-            return;
+            await ReturnError(context, ResponseCatalog.Unauthorized); return;
         }
 
-        //  4. Attach session 
+        // Bước 3.3: Chỉ khi Redis OK, mới Validate Crypto
+        // Điều này chặn các cuộc tấn công spam Token giả 
+        var principal = await _tokenUtil.ValidateCryptoAsync(token);
+        if (principal == null)
+        {
+            await ReturnError(context, ResponseCatalog.Unauthorized); return;
+        }
+
+        // 4. Load & Attach Session
+        var session = DataUtil.RedisValueToObject<UserSession>(redisValue);
+        if (session == null) { await ReturnError(context, ResponseCatalog.Unauthorized); return; }
+        
         context.Items["UserSession"] = session;
+        context.User = principal; // Đẩy vào context.User để dùng User.FindFirst() nếu cần
 
-        //  5. Permission check 
+        // 5. Check Permission
         if (!string.IsNullOrEmpty(requiredPermission))
         {
-            var hasPermission =
-                session.Permissions?.Contains(requiredPermission) ?? false;
-
-            if (!hasPermission)
+            if (!session.Permissions.Contains(requiredPermission))
             {
-                await ReturnError(context, ResponseCatalog.Forbidden);
-                return;
+                await ReturnError(context, ResponseCatalog.Forbidden); return;
             }
         }
 

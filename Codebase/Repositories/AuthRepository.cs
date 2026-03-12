@@ -1,5 +1,6 @@
 using Codebase.Contexts;
 using Codebase.Entities.Auth;
+using Codebase.Models.Dtos.Responses.Auth;
 using Codebase.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
@@ -55,6 +56,27 @@ public class AuthRepository: IAuthRepository
                 .Distinct()
                 .ToListAsync())
             .ToHashSet();
+    }
+    
+    public async Task<UserFullInfo?> GetFullUserInfoAsync(string username)
+    {
+        var data = await _db.Users
+            .Where(u => u.Username == username)
+            .Select(u => new 
+            {
+                User = u,
+                RoleIds = _db.UserRoles.Where(ur => ur.UserId == u.Id).Select(ur => ur.RoleId).ToList(),
+                Permissions = (from ur in _db.UserRoles
+                    join rp in _db.RolePermissions on ur.RoleId equals rp.RoleId
+                    join p in _db.Permissions on rp.PermissionId equals p.Id
+                    where ur.UserId == u.Id
+                    select p.Code).Distinct().ToList()
+            })
+            .FirstOrDefaultAsync();
+
+        if (data == null) return null;
+
+        return new UserFullInfo(data.User, data.RoleIds.ToHashSet(), data.Permissions.ToHashSet());
     }
 
     public Task AddUserAsync(User user)

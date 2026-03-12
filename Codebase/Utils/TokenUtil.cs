@@ -12,16 +12,31 @@ public sealed class TokenUtil
     private readonly string _issuer;
     private readonly string _audience;
     private readonly int _expireMinutes;
+    private readonly JsonWebTokenHandler _handler;
+    private readonly TokenValidationParameters _validationParameters;
 
     public TokenUtil(IConfiguration config)
     {
         _secretKey = config["Jwt:SecretKey"] ?? throw new ArgumentNullException("Jwt SecretKey missing");
         _issuer = config["Jwt:Issuer"] ?? "CodebaseIssuer";
         _audience = config["Jwt:Audience"] ?? "CodebaseAudience";
-        _expireMinutes = int.Parse(config["Jwt:ExpireMinutes"] ?? "1440"); // Mặc định 1 ngày
+        _expireMinutes = int.Parse(config["Jwt:ExpireMinutes"] ?? "15"); 
+        _handler = new JsonWebTokenHandler(); 
+        
+        _validationParameters = new TokenValidationParameters
+        {
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:SecretKey"]!)),
+            ValidateIssuer = true,
+            ValidIssuer = config["Jwt:Issuer"] ?? "CodebaseIssuer",
+            ValidateAudience = true,
+            ValidAudience = config["Jwt:Audience"] ?? "CodebaseAudience",
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.Zero
+        };
     }
 
-    public string GenerateToken(Guid userId, string username , LanguageEnum lang)
+    public Task<(string token, string jti)> GenerateToken(Guid userId, string username , LanguageEnum lang)
     {
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
@@ -30,13 +45,16 @@ public sealed class TokenUtil
         {
             lang = LanguageEnum.Vi;
         }
+        
+        string jti = Guid.NewGuid().ToString();
 
         // Map dữ liệu vào Dictionary Claims
         var claims = new Dictionary<string, object>
         {
             [JwtRegisteredClaimNames.Sub] = userId.ToString(),      // UserId
+            [JwtRegisteredClaimNames.Jti] = jti,
             [JwtRegisteredClaimNames.UniqueName] = username,        // Username
-            ["lang"] = lang                                         // Ngôn ngữ ưu tiên
+            ["lang"] = (int)lang                                  // Ngôn ngữ ưu tiên
         };
 
         var descriptor = new SecurityTokenDescriptor
@@ -47,30 +65,21 @@ public sealed class TokenUtil
             Expires = DateTime.UtcNow.AddMinutes(_expireMinutes),
             SigningCredentials = credentials
         };
-
-        var handler = new JsonWebTokenHandler();
-        return handler.CreateToken(descriptor);
+        
+        string token= _handler.CreateToken(descriptor);
+        return Task.FromResult((token, jti));
     }
 
-
-    public async Task<ClaimsPrincipal?> ValidateTokenAsync(string token)
+    public string? GetJti(string token)
     {
-        if (string.IsNullOrEmpty(token)) return null;
+        if (!_handler.CanReadToken(token)) return null;
+        var jwt = _handler.ReadJsonWebToken(token);
+        return jwt.GetClaim(JwtRegisteredClaimNames.Jti).Value;
+    }
 
-        var handler = new JsonWebTokenHandler();
-        var validationParameters = new TokenValidationParameters
-        {
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey)),
-            ValidateIssuer = true,
-            ValidIssuer = _issuer,
-            ValidateAudience = true,
-            ValidAudience = _audience,
-            ValidateLifetime = true,
-            ClockSkew = TimeSpan.Zero // Không cho phép lệch thời gian để bảo mật tuyệt đối
-        };
-
-        var result = await handler.ValidateTokenAsync(token, validationParameters);
+    public async Task<ClaimsPrincipal?> ValidateCryptoAsync(string token)
+    {
+        var result = await _handler.ValidateTokenAsync(token, _validationParameters);
         return result.IsValid ? new ClaimsPrincipal(result.ClaimsIdentity) : null;
     }
 }

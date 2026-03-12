@@ -7,6 +7,7 @@ namespace Codebase.Entities.Auth
         public String Username { get; set; }
         public String Password { get; set; }
         public LanguageEnum Lang { get; set; }
+        public List<UserRole> UserRoles { get; set; } = new();
     }
 
 }

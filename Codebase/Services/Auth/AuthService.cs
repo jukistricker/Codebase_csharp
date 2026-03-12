@@ -1,4 +1,5 @@
-﻿using Codebase.Models.Enums;
+﻿using Codebase.Models.Dtos.Requests.Auth;
+using Codebase.Models.Enums;
 
 namespace Codebase.Services.Auth;
 
@@ -30,68 +31,64 @@ public class AuthService : IAuthService
 
     public async Task<IResult> SignUpAsync(SignUpDto dto)
     {
+        // 1. Chặn sớm bằng DB 
         if (await _authRepo.UsernameExistsAsync(dto.Username))
             return ResponseDto.Create(ResponseCatalog.Conflict, "auth.username_exists");
 
-        var defaultRoleId = await _authRepo.GetDefaultRoleIdAsync();
-        if (defaultRoleId == null)
-            return ResponseDto.Create(ResponseCatalog.BadRequest, "auth.default_role_not_found");
-        if (dto.InitLang != LanguageEnum.En)
-        {
-            dto.InitLang = LanguageEnum.Vi;
-        }
+        // 2.  Cache Default Role ID
+        var defaultRoleId = GlobalCache.DefaultUserRoleId;
+
+        // 3. Logic Language 
+        var lang = (dto.InitLang == LanguageEnum.En) ? LanguageEnum.En : LanguageEnum.Vi;
+
+        var userId = Guid.CreateVersion7();
+    
+        // 4. BCrypt
+        String hashedPassword = await Task.Run(() => BCrypt.Net.BCrypt.HashPassword(dto.Password));
+
         var user = new User
         {
-            Id = Guid.CreateVersion7(),
+            Id = userId,
             Username = dto.Username,
-            Password = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Lang = dto.InitLang
+            Password = hashedPassword,
+            Lang = lang,
+            CreatedBy = userId,
+            UpdatedBy = userId,
+            UserRoles = new List<UserRole> 
+            { 
+                new UserRole { UserId = userId, RoleId = defaultRoleId } 
+            }
         };
-        
-        user.CreatedBy = user.Id;
-        user.UpdatedBy = user.Id;
-        
-        UserRole newUserRole = new UserRole
-        {
-            UserId = user.Id,
-            RoleId = defaultRoleId.Value
-        };
-        
-        List<UserRole> userRoles=new List<UserRole>();
-
-        userRoles.Add(newUserRole);
-        
+    
         await _authRepo.AddUserAsync(user);
-        await _authRepo.AddUserRolesAsync(userRoles);
         await _authRepo.SaveChangesAsync();
 
         return ResponseDto.Create(ResponseCatalog.Created, "auth.signup_success");
     }
-
     public async Task<IResult> SignInAsync(SignInDto dto)
     {
-        var user = await _authRepo.GetByUsernameAsync(dto.Username);
+        var fullInfo = await _authRepo.GetFullUserInfoAsync(dto.Username);
 
-        if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.Password))
-            return ResponseDto.Create(ResponseCatalog.Unauthorized, "invalid_credential");
+        if (fullInfo == null)
+            return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.invalid_credential");
 
-        var roleIds = await _authRepo.GetUserRoleIdsAsync(user.Id);
-        var permissions = await _authRepo.GetUserPermissionCodesAsync(user.Id);
+        if (!BCrypt.Net.BCrypt.Verify(dto.Password, fullInfo.User.Password))
+            return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.invalid_credential");
 
         var session = new UserSession
         {
-            UserId = user.Id,
-            Username = user.Username,
-            RoleIds = roleIds,
-            Permissions = permissions,
-            Lang = user.Lang,
+            UserId = fullInfo.User.Id,
+            Username = fullInfo.User.Username,
+            RoleIds = fullInfo.RoleIds,
+            Permissions = fullInfo.Permissions,
+            Lang = fullInfo.User.Lang,
             IssuedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.Add(_sessionTtl)
         };
 
-        var token = _tokenUtil.GenerateToken(user.Id, user.Username, user.Lang);
+        var (token, jti) = await _tokenUtil.GenerateToken(fullInfo.User.Id, fullInfo.User.Username, fullInfo.User.Lang);
 
-        await _sessionRepo.StoreAsync(token, session, _sessionTtl);
+        await _sessionRepo.StoreAsync(jti, session, _sessionTtl);
 
         return ResponseDto.Create(ResponseCatalog.Success, "auth.login_success", token);
     }

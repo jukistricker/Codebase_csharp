@@ -74,6 +74,28 @@ app.UseHttpsRedirection();
 
 app.UseGlobalApiErrorHandling(app.Environment);
 
+using (var scope = app.Services.CreateScope())
+{
+    try 
+    {
+        var authRepo = scope.ServiceProvider.GetRequiredService<IAuthRepository>();
+        var defaultRoleId = await authRepo.GetDefaultRoleIdAsync();
+
+        if (defaultRoleId.HasValue)
+        {
+            GlobalCache.DefaultUserRoleId = defaultRoleId.Value;
+        }
+        else
+        {
+            throw new Exception("Default role 'user' not found. Please seed the database.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"[Critical] Failed to init GlobalCache: {ex.Message}");
+    }
+}
+
 app.UseAuthorization();
 
 app.MapControllers();

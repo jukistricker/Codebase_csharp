@@ -26,8 +26,18 @@ public class AppDbContext : DbContext
             .HasKey(rp => new { rp.RoleId, rp.PermissionId });
 
         // Định nghĩa khóa chính tổ hợp cho UserRole
-        modelBuilder.Entity<UserRole>()
-            .HasKey(ur => new { ur.UserId, ur.RoleId });
+        modelBuilder.Entity<UserRole>(entity =>
+        {
+            entity.HasKey(ur => new { ur.UserId, ur.RoleId });
+
+            entity.HasOne(ur => ur.User)
+                .WithMany(u => u.UserRoles)
+                .HasForeignKey(ur => ur.UserId);
+
+            entity.HasOne(ur => ur.Role)
+                .WithMany() // Nếu class Role không có List<UserRole> thì để trống
+                .HasForeignKey(ur => ur.RoleId);
+        });
         
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
