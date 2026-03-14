@@ -1,4 +1,6 @@
+using Codebase.Attributes;
 using Codebase.Models.Dtos.Requests.Auth;
+using Codebase.Models.Dtos.Responses.Shared;
 using Codebase.Services.Interfaces.Auth;
 using Codebase.Utils;
 using Microsoft.AspNetCore.Authorization;
@@ -32,10 +34,20 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("logout")]
-    [Authorize]
-    public async Task LogOut()
+    [RequiredPermission("auth.logout")]
+    public async Task<IResult> LogOut()
     {
-        string token = HttpContext.GetBearerToken();
-        await _authService.SignOutAsync(token);
+        string jti = HttpContext.GetJti();
+        if (jti == null)
+        {
+            return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.jti_not_found");
+        }
+        return await _authService.SignOutAsync(jti);
+    }
+    
+    [HttpGet("test")]
+    [RequiredPermission("user.read")]
+    public string Test()
+    {        return "ok";
     }
 }

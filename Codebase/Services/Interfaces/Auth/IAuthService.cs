@@ -6,5 +6,5 @@ public interface IAuthService
 {
     Task<IResult> SignUpAsync(SignUpDto dto);
     Task<IResult> SignInAsync(SignInDto dto);
-    Task SignOutAsync(string token);
+    Task<IResult> SignOutAsync(string jti);
 }

@@ -25,17 +25,26 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Codebase.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
-FROM base AS final
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
+# Cài đặt postgresql-client để có lệnh psql và pg_isready
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Copy thư mục Migrations vào container để thực thi
-# Đường dẫn trong container sẽ là /app/Migrations
+# Chuyển sang root để setup script
+USER root
+
+# Copy toàn bộ folder Migrations vào /app/Migrations
 COPY Codebase/Migrations ./Migrations
 
-# Chuyển quyền thực thi cho script
-USER root
-RUN chmod +x ./Migrations/migrate.sh
+# 1. Chuyển đổi định dạng file từ Windows sang Linux (QUAN TRỌNG)
+# 2. Cấp quyền thực thi cho script
+RUN sed -i 's/\r$//' ./Migrations/migrate.sh && \
+    chmod +x ./Migrations/migrate.sh
+
+# Chuyển lại user của .NET để đảm bảo an toàn (Best Practice)
 USER $APP_UID
 
+# Entrypoint thực hiện: Chạy migrate xong mới chạy App
 ENTRYPOINT ["/bin/bash", "-c", "./Migrations/migrate.sh && dotnet Codebase.dll"]

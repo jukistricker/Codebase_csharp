@@ -67,7 +67,7 @@ public class RolePermissionMiddleware
         // Bước 3.3: Chỉ khi Redis OK, mới Validate Crypto
         // Điều này chặn các cuộc tấn công spam Token giả 
         var principal = await _tokenUtil.ValidateCryptoAsync(token);
-        if (principal == null)
+        if (principal == null) //Lỗi ở đây
         {
             await ReturnError(context, ResponseCatalog.Unauthorized); return;
         }
@@ -87,6 +87,8 @@ public class RolePermissionMiddleware
                 await ReturnError(context, ResponseCatalog.Forbidden); return;
             }
         }
+        context.Items["Jti"] = jti;
+        Console.WriteLine("Jti: "+context.Items["Jti"]);
 
         await _next(context);
     }

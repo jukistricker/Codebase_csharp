@@ -4,6 +4,6 @@ namespace Codebase.Repositories.Interfaces;
 
 public interface ISessionRepository
 {
-    Task StoreAsync(string token, UserSession session, TimeSpan ttl);
-    Task DeleteAsync(string token);
+    Task StoreAsync(string jti, UserSession session, TimeSpan ttl);
+    Task DeleteAsync(string jti);
 }

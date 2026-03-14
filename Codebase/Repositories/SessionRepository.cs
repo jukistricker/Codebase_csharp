@@ -16,11 +16,11 @@ public class SessionRepository : ISessionRepository
         _redisDb = redis.GetDatabase();
     }
 
-    public Task StoreAsync(string token, UserSession session, TimeSpan ttl)
+    public Task StoreAsync(string jti, UserSession session, TimeSpan ttl)
     {
         return RedisUtil.SetObjectAsJsonAsync(
             _redisDb,
-            $"{KeyPrefix}{token}",
+            $"{KeyPrefix}{jti}",
             session,
             ttl
         );

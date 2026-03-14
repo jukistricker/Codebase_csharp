@@ -25,8 +25,7 @@ public static class HttpContextUtil
             
         }
     }
-
-    // Tận dụng hàm cũ của bạn nếu cần
+    
     public static string GetBearerToken(this HttpContext context)
     {
         if (!context.Request.Headers.TryGetValue("Authorization", out var header))
@@ -36,5 +35,17 @@ public static class HttpContextUtil
         return value.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) 
             ? value["Bearer ".Length..].Trim() 
             : null;
+    }
+    
+    public static string? GetJti(this HttpContext context)
+    {
+        // Kiểm tra xem bạn đã lưu JTI vào Items chưa (như tôi đã gợi ý ở bước trước)
+        if (context.Items.TryGetValue("Jti", out var jti))
+        {
+            return jti?.ToString();
+        }
+
+        // Nếu chưa có trong Items, ta lấy từ User Claims
+        return context.User?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
     }
 }

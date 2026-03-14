@@ -80,6 +80,13 @@ public sealed class TokenUtil
     public async Task<ClaimsPrincipal?> ValidateCryptoAsync(string token)
     {
         var result = await _handler.ValidateTokenAsync(token, _validationParameters);
-        return result.IsValid ? new ClaimsPrincipal(result.ClaimsIdentity) : null;
+        if (!result.IsValid)
+        {
+            // Debug dòng này để thấy lỗi thật (ví dụ: Issuer invalid, hay Signature invalid)
+            Console.WriteLine($"Token Invalid: {result.Exception?.Message}");
+            return null;
+        }
+
+        return new ClaimsPrincipal(result.ClaimsIdentity);
     }
 }

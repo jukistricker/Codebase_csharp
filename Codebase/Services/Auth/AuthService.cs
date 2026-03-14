@@ -1,5 +1,6 @@
-﻿using Codebase.Models.Dtos.Requests.Auth;
+﻿using Codebase.Models.Dtos.Responses.Auth;
 using Codebase.Models.Enums;
+using Microsoft.AspNetCore.Identity;
 
 namespace Codebase.Services.Auth;
 
@@ -16,17 +17,20 @@ public class AuthService : IAuthService
     private readonly IAuthRepository _authRepo;
     private readonly ISessionRepository _sessionRepo;
     private readonly TokenUtil _tokenUtil;
+    private readonly IPasswordHasher<User> _passwordHasher;
 
     private readonly TimeSpan _sessionTtl = TimeSpan.FromHours(2);
 
     public AuthService(
          IAuthRepository authRepo,
         ISessionRepository sessionRepo,
-        TokenUtil tokenUtil)
+        TokenUtil tokenUtil,
+         IPasswordHasher<User> passwordHasher)
     {
         _authRepo = authRepo;
         _sessionRepo = sessionRepo;
         _tokenUtil = tokenUtil;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<IResult> SignUpAsync(SignUpDto dto)
@@ -36,21 +40,18 @@ public class AuthService : IAuthService
             return ResponseDto.Create(ResponseCatalog.Conflict, "auth.username_exists");
 
         // 2.  Cache Default Role ID
-        var defaultRoleId = GlobalCache.DefaultUserRoleId;
+        Guid defaultRoleId = GlobalCache.DefaultUserRoleId;
 
         // 3. Logic Language 
-        var lang = (dto.InitLang == LanguageEnum.En) ? LanguageEnum.En : LanguageEnum.Vi;
+        LanguageEnum lang = (dto.InitLang == LanguageEnum.En) ? LanguageEnum.En : LanguageEnum.Vi;
 
-        var userId = Guid.CreateVersion7();
+        Guid userId = Guid.CreateVersion7();
     
-        // 4. BCrypt
-        String hashedPassword = await Task.Run(() => BCrypt.Net.BCrypt.HashPassword(dto.Password));
 
-        var user = new User
+        User user = new User
         {
             Id = userId,
             Username = dto.Username,
-            Password = hashedPassword,
             Lang = lang,
             CreatedBy = userId,
             UpdatedBy = userId,
@@ -59,6 +60,7 @@ public class AuthService : IAuthService
                 new UserRole { UserId = userId, RoleId = defaultRoleId } 
             }
         };
+        user.Password = _passwordHasher.HashPassword(user, dto.Password);
     
         await _authRepo.AddUserAsync(user);
         await _authRepo.SaveChangesAsync();
@@ -67,13 +69,21 @@ public class AuthService : IAuthService
     }
     public async Task<IResult> SignInAsync(SignInDto dto)
     {
-        var fullInfo = await _authRepo.GetFullUserInfoAsync(dto.Username);
+        UserFullInfo fullInfo = await _authRepo.GetFullUserInfoAsync(dto.Username);
 
         if (fullInfo == null)
             return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.invalid_credential");
 
-        if (!BCrypt.Net.BCrypt.Verify(dto.Password, fullInfo.User.Password))
+        PasswordVerificationResult verificationResult = _passwordHasher.VerifyHashedPassword(
+            fullInfo.User, 
+            fullInfo.User.Password, 
+            dto.Password
+        );
+
+        if (verificationResult == PasswordVerificationResult.Failed)
+        {
             return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.invalid_credential");
+        }
 
         var session = new UserSession
         {
@@ -93,6 +103,12 @@ public class AuthService : IAuthService
         return ResponseDto.Create(ResponseCatalog.Success, "auth.login_success", token);
     }
 
-    public Task SignOutAsync(string token)
-        => _sessionRepo.DeleteAsync(token);
+    public async Task<IResult> SignOutAsync(string jti)
+    {
+        await _sessionRepo.DeleteAsync(jti);
+        return Results.NoContent();
+    }
+         
+    
+    
 }
