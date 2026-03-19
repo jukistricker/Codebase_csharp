@@ -9,35 +9,20 @@ namespace Codebase.Services.Rbac;
 public class RbacService : IRbacService
 {
     private readonly IRbacRepository _repo;
-    private readonly IHttpContextAccessor _accessor;
 
-    public RbacService(IRbacRepository repo, IHttpContextAccessor accessor)
+    public RbacService(IRbacRepository repo)
     {
         _repo = repo;
-        _accessor = accessor;
     }
-
 
     public async Task<IResult> SavePermissionGroupAsync(PermissionGroupPostRequest request)
     {
-        PermissionGroup group = new PermissionGroup
-        {
-            Name = request.Name,
-            Code = request.Code,
-            SortOrder = request.SortOrder
-        };
-        if(request.Id!= null||request.Id != Guid.Empty)
-        {
-            if(await _repo.CheckGroupCodeExistsAsync(request.Code,request.Id))
-                return ResponseDto.Create(ResponseCatalog.BadRequest,"rbac.permission.group_code_exists");
-            group.Id = request.Id.Value;
-            _repo.Update(group);
-        }
-        else
-        {
-            if(await _repo.CheckGroupCodeExistsAsync(request.Code))
-                return ResponseDto.Create(ResponseCatalog.BadRequest,"rbac.permission.group_code_exists");
-        }
+        bool isUpdate = request.Id.HasValue && request.Id != Guid.Empty;
         
+        PermissionGroup entity = request.ToEntity();
+        
+        entity= await _repo.SavePermissionGroupAsync(entity, isUpdate);
+
+        return ResponseDto.Create(ResponseCatalog.Success, "Permission group saved successfully.",entity);
     }
 }

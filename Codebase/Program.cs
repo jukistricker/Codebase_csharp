@@ -6,6 +6,8 @@ using Codebase.Repositories;
 using Codebase.Repositories.Interfaces;
 using Codebase.Services.Auth;
 using Codebase.Services.Interfaces.Auth;
+using Codebase.Services.Interfaces.Rbac;
+using Codebase.Services.Rbac;
 using Codebase.Utils;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -89,9 +91,11 @@ builder.Services.AddHttpContextAccessor();
 // Đăng ký Repository 
 builder.Services.AddScoped<IAuthRepository, AuthRepository>();
 builder.Services.AddScoped<ISessionRepository, SessionRepository>();
+builder.Services.AddScoped<IRbacRepository, RbacRepository>();
 
 // Đăng ký Service
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddScoped<IRbacService, RbacService>();
 
 //Đăng ký các Unstatic Util
 builder.Services.AddSingleton<TokenUtil>();

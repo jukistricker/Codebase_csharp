@@ -48,4 +48,5 @@ public static class HttpContextUtil
         // Nếu chưa có trong Items, ta lấy từ User Claims
         return context.User?.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
     }
+    
 }

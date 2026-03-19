@@ -1,5 +1,7 @@
 ﻿using Codebase.Models.Dtos.Responses.Shared;
+using Codebase.Utils;
 using Microsoft.AspNetCore.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Codebase.Middlewares;
@@ -23,7 +25,23 @@ public static class GlobalApiErrorHandler
 
                 var logger = context.RequestServices.GetRequiredService<ILogger<ResponseCatalog>>();
 
+                // xử lý lỗi db
+                if (ex is DbUpdateException dbEx && dbEx.InnerException is Npgsql.PostgresException pgEx)
+                {
+                    // 23505: Unique Violation | 23503: Foreign Key Violation
+                    if (pgEx.SqlState == "23505" || pgEx.SqlState == "23503")
+                    {
+                        var mappedMsg = DbErrorRegistry.GetErrorMessage(pgEx.ConstraintName);
+                
+                        if (mappedMsg != null)
+                        {
+                            catalog = ResponseCatalog.BadRequest;
+                            errorMessage = mappedMsg;
+                        }
+                    }
+                }
 
+                // Switch case cho các loại Exception khác
                 switch (ex)
                 {
                     case ArgumentException or ArgumentNullException:
@@ -49,6 +67,11 @@ public static class GlobalApiErrorHandler
                     case NotImplementedException:
                         catalog = ResponseCatalog.NotImplemented;
                         errorMessage = "feature_under_development";
+                        break;
+                    
+                    case DbUpdateConcurrencyException:
+                        catalog = ResponseCatalog.NotFound; // Trả về 404 cho đúng bản chất
+                        errorMessage = "resource_not_found"; 
                         break;
 
                 }

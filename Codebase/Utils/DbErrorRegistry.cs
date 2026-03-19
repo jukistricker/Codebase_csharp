@@ -1,6 +1,6 @@
 ﻿namespace Codebase.Utils;
 
-public static class DatabaseErrorRegistry
+public static class DbErrorRegistry
 {
     /** TODO: Tên key phải trùng với tên constraint trong DB để có thể map chính xác lỗi
         Key: Tên Constraint trong DB | Value: Thông điệp lỗi trả về cho Client **/
