@@ -1,6 +1,9 @@
+using Codebase.Entities.Auth;
+using Codebase.Models.Dtos.Requests.RBAC;
+
 namespace Codebase.Services.Interfaces.Rbac;
 
-public class IRbacService
+public interface IRbacService
 {
-    
+    Task<IResult> SavePermissionGroupAsync(PermissionGroupPostRequest request);
 }

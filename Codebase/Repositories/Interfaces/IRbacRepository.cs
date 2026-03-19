@@ -1,25 +1,19 @@
-namespace Codebase.Repositories.Interfaces;
+using Codebase.Entities.Auth;
+using Codebase.Models.Dtos.Requests.RBAC;
 
-public class IRBACRepository
-{
-    
-}
+namespace Codebase.Repositories.Interfaces;
 
 public interface IRbacRepository
 {
-    // Permission Groups
-    Task<IEnumerable<PermissionGroup>> GetGroupsAsync();
-    Task<PermissionGroup?> GetGroupByIdAsync(Guid id);
+    // Queries
+    Task<List<PermissionGroup>> GetAllGroupsAsync();
+    Task<PermissionGroupDetailDto?> GetGroupPermissionDetailAsync(Guid groupId);
+    Task<bool> CheckGroupCodeExistsAsync(string code, Guid? excludeId = null);
     
-    // Roles
-    Task<Role?> GetRoleByIdAsync(Guid id);
-    Task<List<Permission>> GetPermissionsByRoleIdAsync(Guid roleId);
-    
-    // Command
+    // Commands
+    Task Update<T>(T entity) where T : class;
     Task AddAsync<T>(T entity) where T : class;
     void Delete<T>(T entity) where T : class;
-    Task SaveChangesAsync();
-    
-    // Bulk Assignment
     Task UpdateRolePermissionsAsync(Guid roleId, List<Guid> permissionIds);
+    Task<bool> SaveChangesAsync();
 }
