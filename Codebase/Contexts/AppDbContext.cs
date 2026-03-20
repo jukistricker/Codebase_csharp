@@ -46,23 +46,16 @@ public class AppDbContext : DbContext
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
             // Đổi tên Table: PermissionGroup -> permission_groups
-            var tableName = ToSnakeCase(entity.GetTableName() ?? entity.ClrType.Name);
+            var tableName = StringUtil.ToSnakeCase(entity.GetTableName() ?? entity.ClrType.Name);
             entity.SetTableName(tableName);
 
             foreach (var property in entity.GetProperties())
                 // Đổi tên Column: PermissionGroupId -> permission_group_id
-                property.SetColumnName(ToSnakeCase(property.Name));
+                property.SetColumnName(StringUtil.ToSnakeCase(property.Name));
         }
     }
 
-    private string ToSnakeCase(string input)
-    {
-        if (string.IsNullOrEmpty(input)) return input;
-
-        return string.Concat(input.Select((x, i) =>
-                i > 0 && char.IsUpper(x) ? "_" + x : x.ToString()))
-            .ToLower();
-    }
+    
 
     public override int SaveChanges()
     {

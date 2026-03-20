@@ -123,6 +123,9 @@ SELECT 'user.update', id FROM public.permission_groups WHERE code = 'user_group'
 INSERT INTO public.permissions (code, permission_group_id)
 SELECT 'user.delete', id FROM public.permission_groups WHERE code = 'user_group'
     ON CONFLICT (code) DO NOTHING;
+INSERT INTO public.permissions (code, permission_group_id)
+SELECT 'auth.view_users', id FROM public.permission_groups WHERE code = 'auth_group'
+    ON CONFLICT (code) DO NOTHING;
 
 -- Admin Role Permissions (Full)
 INSERT INTO public.role_permissions (role_id, permission_id)
@@ -132,7 +135,7 @@ WHERE r.name = 'admin' ON CONFLICT DO NOTHING;
 -- User Role Permissions (Limited)
 INSERT INTO public.role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM public.roles r
-                           JOIN public.permissions p ON p.code IN ('auth.login', 'auth.logout', 'user.read')
+                           JOIN public.permissions p ON p.code IN ('auth.login', 'auth.logout', 'user.read', 'auth.view_users')
 WHERE r.name = 'user' ON CONFLICT DO NOTHING;
 
 -- Admin User Creation

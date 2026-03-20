@@ -1,5 +1,5 @@
 using Codebase.Attributes;
-using Codebase.Models.Dtos.Requests.Auth;
+using Codebase.Models.Dtos.Requests;
 using Codebase.Models.Dtos.Responses.Shared;
 using Codebase.Services.Interfaces.Auth;
 using Codebase.Utils;
@@ -45,9 +45,11 @@ public class AuthController : ControllerBase
         return await _authService.SignOutAsync(jti);
     }
     
-    [HttpGet("test")]
-    [RequiredPermission("user.read")]
-    public string Test()
-    {        return "ok";
+    [HttpGet]
+    [RequiredPermission("auth.view_users")]
+    public async Task<IResult> GetAll([FromQuery] AuthFilterRequest req)
+    {
+        return await _authService.GetUsersAsync(req);
+        
     }
 }

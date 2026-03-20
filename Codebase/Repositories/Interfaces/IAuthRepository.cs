@@ -1,5 +1,6 @@
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Responses.Auth;
+using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Responses;
 
 namespace Codebase.Repositories.Interfaces;
 
@@ -13,9 +14,10 @@ public interface IAuthRepository
 
     Task<HashSet<Guid>> GetUserRoleIdsAsync(Guid userId);
     Task<HashSet<string>> GetUserPermissionCodesAsync(Guid userId);
-    Task<UserFullInfo?> GetFullUserInfoAsync(string username);
+    Task<UserFullInfo> GetFullUserInfoAsync(string username);
     Task AddUserAsync(User user);
     Task AddUserRolesAsync(IEnumerable<UserRole> roles);
+    Task<(List<UserResponse> Items, string? NextCursor)> GetUsersAsync(AuthFilterRequest req);
 
     Task SaveChangesAsync();
 }

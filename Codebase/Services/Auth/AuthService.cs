@@ -1,11 +1,13 @@
-﻿using Codebase.Models.Dtos.Responses.Auth;
+﻿using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Responses;
+using Codebase.Models.Dtos.Responses.Search;
 using Codebase.Models.Enums;
 using Microsoft.AspNetCore.Identity;
 
 namespace Codebase.Services.Auth;
 
 using Entities.Auth;
-using Models.Dtos.Requests.Auth;
+using Models.Dtos.Requests;
 using Models.Dtos.Responses.Shared;
 using Repositories.Interfaces;
 using Services.Interfaces.Auth;
@@ -109,6 +111,20 @@ public class AuthService : IAuthService
         return Results.NoContent();
     }
          
+    public async Task<IResult> GetUsersAsync(AuthFilterRequest req)
+    {
+        // Giới hạn Limit tối đa để tránh kéo quá nhiều RAM
+        if (req.Limit > 100) req.Limit = 100;
+        if (req.Limit <= 0) req.Limit = 20;
+
+        // 2. Gọi Repository
+        // Nhận về Tuple (Items, NextCursor)
+        var (items, nextCursor) = await _authRepo.GetUsersAsync(req);
+
+        // 3. Đóng gói vào DTO chuẩn
+        PagedResponse<UserResponse> response= new PagedResponse<UserResponse>(items, nextCursor);
+        return ResponseDto.Create(ResponseCatalog.Success, "auth.users_list", response);
+    }
     
     
 }

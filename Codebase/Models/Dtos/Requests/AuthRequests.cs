@@ -1,7 +1,8 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using Codebase.Models.Dtos.Requests.Search;
 using Codebase.Models.Enums;
 
-namespace Codebase.Models.Dtos.Requests.Auth;
+namespace Codebase.Models.Dtos.Requests;
 
 public class SignUpDto
 {
@@ -22,4 +23,10 @@ public class SignInDto
 {
     public string Username { get; set; } = null!;
     public string Password { get; set; } = null!;
+}
+
+public class AuthFilterRequest : BaseFilterRequest
+{
+    public Guid? Id { get; set; }
+    public string? Username { get; set; }
 }

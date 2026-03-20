@@ -23,6 +23,11 @@ public class RbacService : IRbacService
         
         entity= await _repo.SavePermissionGroupAsync(entity, isUpdate);
 
-        return ResponseDto.Create(ResponseCatalog.Success, "Permission group saved successfully.",entity);
+        return ResponseDto.Create(ResponseCatalog.Success, "rbac.permission_group.saved",entity);
+    }
+
+    public Task<IResult> SearchPermissionGroupsAsync()
+    {
+        throw new NotImplementedException();
     }
 }

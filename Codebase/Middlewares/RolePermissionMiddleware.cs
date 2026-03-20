@@ -1,4 +1,4 @@
-﻿using Codebase.Models.Dtos.Requests.Auth;
+﻿using Codebase.Models.Dtos.Responses;
 
 namespace Codebase.Middlewares;
 using Attributes;

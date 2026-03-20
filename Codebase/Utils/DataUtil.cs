@@ -71,6 +71,6 @@ public static class DataUtil
         var json = JsonSerializer.Serialize(source, _options);
         return JsonSerializer.Deserialize<T>(json, _options);
     }
-
+    
 
 }
