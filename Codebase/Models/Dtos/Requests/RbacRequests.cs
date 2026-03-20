@@ -28,7 +28,6 @@ public class PermissionGroupFilterRequest : BaseFilterRequest
     // Bạn có thể thêm các filter cứng ở đây nếu cần
     // ví dụ: public bool? IsActive { get; set; }
     public Guid? Id { get; set; }
-    public string? Name { get; set; }
     public string? Code { get; set; }
 }
 

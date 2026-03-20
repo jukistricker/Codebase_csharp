@@ -1,6 +1,10 @@
+using System.Linq.Dynamic.Core;
 using Codebase.Contexts;
 using Codebase.Entities.Auth;
+using Codebase.Models.Dtos.Requests.RBAC;
+using Codebase.Models.Dtos.Responses;
 using Codebase.Repositories.Interfaces;
+using Codebase.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codebase.Repositories;
@@ -8,21 +12,21 @@ namespace Codebase.Repositories;
 public class RbacRepository : IRbacRepository
 {
     
-    private readonly AppDbContext _context;
+    private readonly AppDbContext _db;
 
-    public RbacRepository(AppDbContext context) => _context = context;
+    public RbacRepository(AppDbContext context) => _db = context;
 
     // public async Task<PermissionGroupDetailDto?> GetGroupPermissionDetailAsync(Guid groupPermissionId)
     // {
     //     // Sử dụng Query Projection để tránh lỗi Ambiguous và tối ưu RAM
-    //     IQueryable<PermissionGroupDetailDto> query = _context.PermissionGroups
+    //     IQueryable<PermissionGroupDetailDto> query = _db.PermissionGroups
     //         .AsNoTracking()
     //         .Where(g => g.Id == groupPermissionId)
     //         .Select(g => new PermissionGroupDetailDto(
     //             g.Id, 
     //             g.Name, 
     //             g.Code,
-    //             _context.Permissions
+    //             _db.Permissions
     //                 .Where(p => p.PermissionGroupId == g.Id)
     //                 .Select(p => new PermissionDto(p.Id, p.Code))
     //                 .ToList() 
@@ -33,7 +37,7 @@ public class RbacRepository : IRbacRepository
 
     public async Task<bool> CheckGroupCodeExistsAsync(string code, Guid? excludeId = null)
     {
-        return await _context.PermissionGroups
+        return await _db.PermissionGroups
             .AsNoTracking()
             .AnyAsync(g => g.Code == code && (!excludeId.HasValue || g.Id != excludeId.Value));
     }
@@ -43,30 +47,72 @@ public class RbacRepository : IRbacRepository
         if (isUpdate)
         {
             // Chỉ Attach và đánh dấu Modified (0 Roundtrip SELECT)
-            _context.PermissionGroups.Attach(entity);
-            _context.Entry(entity).State = EntityState.Modified;
+            _db.PermissionGroups.Attach(entity);
+            _db.Entry(entity).State = EntityState.Modified;
         }
         else
         {
-            _context.PermissionGroups.Add(entity);
+            _db.PermissionGroups.Add(entity);
         }
 
         // Đẩy xuống DB 
         // Lỗi Unique/Concurrency sẽ sinh tại đây và bay thẳng lên GEH
-        await _context.SaveChangesAsync();
+        await _db.SaveChangesAsync();
         return entity;
     }
+    
+    public async Task<(List<PermissionGroupResponse> Items, string? NextCursor)> GetPermissionGroupsAsync(PermissionGroupFilterRequest req)
+    {
+        IQueryable<PermissionGroup> query = _db.PermissionGroups.AsNoTracking();
+        
+        if (req.Id.HasValue)
+        {
+            query = query.Where(u => u.Id == req.Id.Value);
+        }
 
-  
+        if (!string.IsNullOrWhiteSpace(req.Code))
+        {
+            query = query.Where(u => u.Code == req.Code);
+        }
+
+        if (!string.IsNullOrWhiteSpace(req.Search))
+        {
+            string term = req.Search.Trim();
+            query = query.Where(u => EF.Functions.ILike(u.Name, $"%{term}%"));
+        }
+
+        string? sortField = req.Sort?.StartsWith("-") == true 
+            ? "-" + StringUtil.ToPascalCase(req.Sort.TrimStart('-')) 
+            : StringUtil.ToPascalCase(req.Sort);
+
+        string selectFields = StringUtil.GetSelectFields<PermissionGroupResponse>(req.Select);
+
+        var items = await query
+            .ApplyCursor<PermissionGroup, Guid>(req.Cursor, req.Limit, sortField)
+            .Select<PermissionGroupResponse>($"new({selectFields})") 
+            .ToListAsync();
+
+        string? nextCursor = null;
+        if (items.Count > req.Limit)
+        {
+            nextCursor = items[req.Limit - 1].Id.ToString();
+            items.RemoveAt(req.Limit);
+        }
+
+        return (items, nextCursor);
+    }
+
+
+
     // public async Task<RoleDetailDto?> GetRoleDetailAsync(Guid roleId)
     // {
-    //     return await _context.Roles
+    //     return await _db.Roles
     //         .AsNoTracking()
     //         .Where(r => r.Id == roleId)
     //         .Select(r => new RoleDetailDto(
     //             r.Id, 
     //             r.Name,
-    //             _context.RolePermissions
+    //             _db.RolePermissions
     //                 .Where(rp => rp.RoleId == r.Id)
     //                 .Select(rp => new PermissionDto(rp.PermissionId, rp.Permission.Code))
     //                 .ToList()
@@ -76,7 +122,7 @@ public class RbacRepository : IRbacRepository
     public async Task UpdateRolePermissionsAsync(Guid roleId, List<Guid> permissionIds)
     {
         // Xóa cũ bằng ExecuteDelete 
-        await _context.RolePermissions
+        await _db.RolePermissions
             .Where(rp => rp.RoleId == roleId)
             .ExecuteDeleteAsync();
 
@@ -87,27 +133,27 @@ public class RbacRepository : IRbacRepository
                 RoleId = roleId, 
                 PermissionId = pId 
             });
-            await _context.RolePermissions.AddRangeAsync(newItems);
-            await _context.SaveChangesAsync();
+            await _db.RolePermissions.AddRangeAsync(newItems);
+            await _db.SaveChangesAsync();
         }
     }
     
     public Task Update<T>(T entity) where T : class
     { 
-        _context.Set<T>().Update(entity);
+        _db.Set<T>().Update(entity);
         return Task.CompletedTask;
     }
     
     public async Task AddAsync<T>(T entity) where T : class 
-        => await _context.Set<T>().AddAsync(entity);
+        => await _db.Set<T>().AddAsync(entity);
 
     public void Delete<T>(T entity) where T : class 
-        => _context.Set<T>().Remove(entity);
+        => _db.Set<T>().Remove(entity);
 
     public async Task<bool> SaveChangesAsync() 
-        => await _context.SaveChangesAsync() > 0;
+        => await _db.SaveChangesAsync() > 0;
 
     public async Task<List<PermissionGroup>> GetAllGroupsAsync()
-        => await _context.PermissionGroups.AsNoTracking().OrderBy(x => x.SortOrder).ToListAsync();
+        => await _db.PermissionGroups.AsNoTracking().OrderBy(x => x.SortOrder).ToListAsync();
     
 }
