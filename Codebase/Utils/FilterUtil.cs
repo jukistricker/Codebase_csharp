@@ -7,28 +7,9 @@ namespace Codebase.Utils;
 
 public static class FilterUtil
 {
-    // 1. Sắp xếp động theo chuỗi "name" hoặc "-id"
-    public static IQueryable<T> ApplyDeterministicSort<T>(this IQueryable<T> query, string? sort)
-    {
-        // Mặc định nếu không truyền sort
-        if (string.IsNullOrWhiteSpace(sort)) return query.OrderBy("Id desc");
-
-        bool isDescending = sort.StartsWith("-");
-        string field = sort.TrimStart('-');
-
-        // Nếu trường sort đã là Id (không phân biệt hoa thường)
-        if (field.Equals("Id", StringComparison.OrdinalIgnoreCase))
-            return query.OrderBy($"Id {(isDescending ? "desc" : "asc")}");
-
-        // Sửa lỗi cú pháp chuỗi: dùng dấu phẩy để phân cách các cột sort trong string
-        // Cú pháp đúng của Dynamic LINQ: "Name desc, Id desc"
-        string sortExpression = $"{field} {(isDescending ? "desc" : "asc")}, Id {(isDescending ? "desc" : "asc")}";
-
-        return query.OrderBy(sortExpression);
-    }
 
     // 2. Cursor Pagination O(1)
-    public static IQueryable<T> ApplyCursor<T, TCursor>(
+    public static IQueryable<T> ApplyCursor<T>(
         this IQueryable<T> query,
         string? cursor,
         int limit,
@@ -38,45 +19,42 @@ public static class FilterUtil
         string sortField = sort?.TrimStart('-') ?? "Id";
 
         if (!string.IsNullOrEmpty(cursor))
+        {
             try
             {
-                TypeConverter converter = TypeDescriptor.GetConverter(typeof(TCursor));
-                TCursor? convertedCursor = (TCursor?)converter.ConvertFromString(cursor);
-
-                if (convertedCursor != null)
+                // Lấy Type của thuộc tính đang dùng để sort (ví dụ: SortOrder là int, Id là Guid)
+                var propertyInfo = typeof(T).GetProperty(sortField);
+                if (propertyInfo != null)
                 {
-                    // Xây dựng Expression: x => EF.Property<TCursor>(x, sortField) < convertedCursor
-                    ParameterExpression parameter = Expression.Parameter(typeof(T), "x");
-                    MethodCallExpression property = Expression.Call(
-                        typeof(EF),
-                        nameof(EF.Property),
-                        new[] { typeof(TCursor) },
-                        parameter,
-                        Expression.Constant(sortField));
+                    var type = propertyInfo.PropertyType;
+                    var converter = TypeDescriptor.GetConverter(type);
+                    var convertedCursor = converter.ConvertFromString(cursor);
 
-                    // Tạo toán tử so sánh (LessThan hoặc GreaterThan)
-                    BinaryExpression comparison = isDescending
-                        ? Expression.LessThan(property, Expression.Constant(convertedCursor))
-                        : Expression.GreaterThan(property, Expression.Constant(convertedCursor));
+                    if (convertedCursor != null)
+                    {
+                        var parameter = Expression.Parameter(typeof(T), "x");
+                        var property = Expression.Call(typeof(EF), nameof(EF.Property), new[] { type }, parameter, Expression.Constant(sortField));
 
-                    Expression<Func<T, bool>> lambda = Expression.Lambda<Func<T, bool>>(comparison, parameter);
+                        // Tạo toán tử so sánh
+                        BinaryExpression comparison = isDescending
+                            ? Expression.LessThan(property, Expression.Constant(convertedCursor))
+                            : Expression.GreaterThan(property, Expression.Constant(convertedCursor));
 
-                    // Ép kiểu tường minh IQueryable<T> để tránh Ambiguous invocation
-                    query = query.Where(lambda);
+                        query = query.Where(Expression.Lambda<Func<T, bool>>(comparison, parameter));
+                    }
                 }
             }
-            catch
-            {
-                return query.Take(0);
-            }
+            catch { return query.Take(0); }
+        }
 
-        // Xử lý OrderBy bằng Dynamic LINQ (nhớ ép kiểu sang IQueryable<T>)
+        // --- ĐÂY CHÍNH LÀ MULTIPLE SORT ---
         string direction = isDescending ? "desc" : "asc";
+    
+        // Nếu sortField không phải Id, ta thêm Id vào để đảm bảo tính Deterministic (không trùng lặp trang)
         string orderByStr = sortField.Equals("Id", StringComparison.OrdinalIgnoreCase)
             ? $"Id {direction}"
             : $"{sortField} {direction}, Id {direction}";
 
-        // Gọi OrderBy của Dynamic LINQ và ép về IQueryable<T>
         return query.OrderBy(orderByStr).Take(limit + 1);
     }
 
