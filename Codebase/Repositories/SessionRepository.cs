@@ -1,4 +1,4 @@
-using Codebase.Models.Dtos.Requests.Auth;
+using Codebase.Models.Dtos.Responses;
 using Codebase.Repositories.Interfaces;
 using Codebase.Utils;
 

@@ -1,6 +1,6 @@
 ﻿using Codebase.Models.Enums;
 
-namespace Codebase.Models.Dtos.Requests.Auth;
+namespace Codebase.Models.Dtos.Responses;
 
 public class UserSession
 {

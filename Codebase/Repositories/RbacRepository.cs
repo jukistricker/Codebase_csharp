@@ -1,6 +1,5 @@
 using Codebase.Contexts;
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Requests.RBAC;
 using Codebase.Repositories.Interfaces;
 using Microsoft.EntityFrameworkCore;
 

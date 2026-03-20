@@ -1,7 +1,10 @@
 using Codebase.Contexts;
+using System.Linq.Dynamic.Core;
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Responses.Auth;
+using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Responses;
 using Codebase.Repositories.Interfaces;
+using Codebase.Utils;
 using Microsoft.EntityFrameworkCore;
 
 namespace Codebase.Repositories;
@@ -58,7 +61,7 @@ public class AuthRepository: IAuthRepository
             .ToHashSet();
     }
     
-    public async Task<UserFullInfo?> GetFullUserInfoAsync(string username)
+    public async Task<UserFullInfo> GetFullUserInfoAsync(string username)
     {
         var data = await _db.Users
             .Where(u => u.Username == username)
@@ -84,6 +87,56 @@ public class AuthRepository: IAuthRepository
 
     public Task AddUserRolesAsync(IEnumerable<UserRole> roles)
         => _db.UserRoles.AddRangeAsync(roles);
+    
+    public async Task<(List<UserResponse> Items, string? NextCursor)> GetUsersAsync(AuthFilterRequest req)
+    {
+        // 1. Khởi tạo Query
+        IQueryable<User> query = _db.Users.AsNoTracking();
+        
+        if (req.Id.HasValue)
+        {
+            query = query.Where(u => u.Id == req.Id.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(req.Username))
+        {
+            query = query.Where(u => u.Username == req.Username);
+        }
+
+        // 2. Search thủ công (Tự cấu hình theo cột có Index)
+        if (!string.IsNullOrWhiteSpace(req.Search))
+        {
+            string term = req.Search.Trim();
+            query = query.Where(u => EF.Functions.ILike(u.FullName, $"%{term}%"));
+        }
+
+        // 3. Chuẩn hóa Sort
+        string? sortField = req.Sort?.StartsWith("-") == true 
+            ? "-" + StringUtil.ToPascalCase(req.Sort.TrimStart('-')) 
+            : StringUtil.ToPascalCase(req.Sort);
+
+        // 4. Lấy SelectFields động dựa trên Class UserResponse
+        // Nó sẽ tự sinh ra: "Id, Username, Email, FullName..." dựa trên các property bạn khai báo trong DTO
+        string selectFields = StringUtil.GetSelectFields<UserResponse>(req.Select);
+
+        // 5. Thực thi Query
+        var items = await query
+            .ApplyCursor<User, Guid>(req.Cursor, req.Limit, sortField)
+            .Select<UserResponse>($"new({selectFields})") 
+            .ToListAsync();
+
+        // 6. Xác định Next Cursor (Dành cho Endless Scroll)
+        string? nextCursor = null;
+        if (items.Count > req.Limit)
+        {
+            // Lấy Id của bản ghi cuối cùng (bản ghi thứ Limit)
+            nextCursor = items[req.Limit - 1].Id.ToString();
+            // Xóa bản ghi thừa (bản ghi thứ Limit + 1 dùng để check trang tiếp)
+            items.RemoveAt(req.Limit);
+        }
+
+        return (items, nextCursor);
+    }
 
     public Task SaveChangesAsync()
         => _db.SaveChangesAsync();

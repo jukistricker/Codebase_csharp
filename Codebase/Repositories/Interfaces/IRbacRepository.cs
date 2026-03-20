@@ -1,5 +1,4 @@
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Requests.RBAC;
 
 namespace Codebase.Repositories.Interfaces;
 
