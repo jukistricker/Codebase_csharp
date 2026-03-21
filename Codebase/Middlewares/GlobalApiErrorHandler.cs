@@ -2,7 +2,6 @@
 using Codebase.Utils;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Codebase.Middlewares;
 
