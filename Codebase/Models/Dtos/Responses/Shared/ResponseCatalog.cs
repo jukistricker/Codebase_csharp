@@ -18,7 +18,7 @@ public sealed class ResponseCatalog
     // ===== 4xx Client Errors (Common) =====
     public static readonly ResponseCatalog BadRequest = new(400, "bad_request");
     public static readonly ResponseCatalog Unauthorized = new(401, "unauthorized");
-    public static readonly ResponseCatalog Forbidden = new(404, "not_found");
+    public static readonly ResponseCatalog Forbidden = new(403, "forbidden");
     public static readonly ResponseCatalog NotFound = new(404, "not_found");
     public static readonly ResponseCatalog MethodNotAllowed = new(405, "method_not_allowed");
     public static readonly ResponseCatalog NotAcceptable = new(406, "not_acceptable");

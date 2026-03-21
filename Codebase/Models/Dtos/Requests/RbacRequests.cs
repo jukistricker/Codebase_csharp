@@ -1,7 +1,7 @@
 using Codebase.Entities.Auth;
 using Codebase.Models.Dtos.Requests.Search;
 
-namespace Codebase.Models.Dtos.Requests.RBAC;
+namespace Codebase.Models.Dtos.Requests;
 
 // Permission & Group
 public class PermissionGroupPostRequest

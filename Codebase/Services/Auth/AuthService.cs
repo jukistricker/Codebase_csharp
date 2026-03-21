@@ -113,11 +113,6 @@ public class AuthService : IAuthService
          
     public async Task<IResult> GetUsersAsync(AuthFilterRequest req)
     {
-        // Giới hạn Limit tối đa để tránh kéo quá nhiều RAM
-        if (req.Limit > 100) req.Limit = 100;
-        if (req.Limit <= 0) req.Limit = 20;
-
-        // 2. Gọi Repository
         // Nhận về Tuple (Items, NextCursor)
         var (items, nextCursor) = await _authRepo.GetUsersAsync(req);
 

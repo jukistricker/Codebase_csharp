@@ -124,7 +124,7 @@ INSERT INTO public.permissions (code, permission_group_id)
 SELECT 'user.delete', id FROM public.permission_groups WHERE code = 'user_group'
     ON CONFLICT (code) DO NOTHING;
 INSERT INTO public.permissions (code, permission_group_id)
-SELECT 'auth.view_users', id FROM public.permission_groups WHERE code = 'auth_group'
+SELECT 'user.view_users', id FROM public.permission_groups WHERE code = 'user_group'
     ON CONFLICT (code) DO NOTHING;
 
 -- Admin Role Permissions (Full)

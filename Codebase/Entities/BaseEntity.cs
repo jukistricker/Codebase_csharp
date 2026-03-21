@@ -11,17 +11,17 @@
     {
         public T Id { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public T CreatedBy { get; set; }
+        public T? CreatedBy { get; set; }
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public T UpdatedBy { get; set; }
+        public T? UpdatedBy { get; set; }
     }
     
     public abstract class BaseEntity : IAuditEntity
     {
         public Guid Id { get; set; }
         public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public Guid CreatedBy { get; set; }
+        public Guid? CreatedBy { get; set; }
         public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
-        public Guid UpdatedBy { get; set; }
+        public Guid? UpdatedBy { get; set; }
     }
 }
