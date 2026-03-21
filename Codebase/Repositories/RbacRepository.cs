@@ -60,47 +60,37 @@ public class RbacRepository : IRbacRepository
         await _db.SaveChangesAsync();
         return entity;
     }
-    
+
     public async Task<(List<PermissionGroupResponse> Items, string? NextCursor)> GetPermissionGroupsAsync(PermissionGroupFilterRequest req)
     {
         IQueryable<PermissionGroup> query = _db.PermissionGroups.AsNoTracking();
-        
-        if (req.Id.HasValue)
-        {
-            query = query.Where(u => u.Id == req.Id.Value);
-        }
 
-        if (!string.IsNullOrWhiteSpace(req.Code))
-        {
-            query = query.Where(u => u.Code == req.Code);
-        }
-
+        if (req.Id.HasValue) query = query.Where(u => u.Id == req.Id.Value);
+        if (!string.IsNullOrWhiteSpace(req.Code)) query = query.Where(u => u.Code == req.Code);
         if (!string.IsNullOrWhiteSpace(req.Search))
         {
-            string term = req.Search.Trim();
-            query = query.Where(u => EF.Functions.ILike(u.Name, $"%{term}%"));
+            query = query.Where(u => EF.Functions.ILike(u.Name, $"%{req.Search.Trim()}%"));
         }
-
-        string? sortField = req.Sort?.StartsWith("-") == true 
-            ? "-" + StringUtil.ToPascalCase(req.Sort.TrimStart('-')) 
-            : StringUtil.ToPascalCase(req.Sort);
-
-        string selectFields = StringUtil.GetSelectFields<PermissionGroupResponse>(req.Select);
-
-        var items = await query
-            .ApplyCursor<PermissionGroup, Guid>(req.Cursor, req.Limit, sortField)
-            .Select<PermissionGroupResponse>($"new({selectFields})") 
+        
+        List<PermissionGroupResponse> items = await query
+            .ApplyCursor<PermissionGroup, Guid>(req.Cursor, req.SortField, req.IsDescending) 
+            .ApplyDeterministicSort(req.FullSortParam)
+            .Take(req.Limit + 1)
+            .ApplySelect<PermissionGroup, PermissionGroupResponse>(StringUtil.GetSelectFields<PermissionGroupResponse>(req.Select))
             .ToListAsync();
 
         string? nextCursor = null;
         if (items.Count > req.Limit)
         {
-            nextCursor = items[req.Limit - 1].Id.ToString();
+            PermissionGroupResponse lastValidItem = items[req.Limit - 1];
+            nextCursor = lastValidItem.GetType().GetProperty(req.SortField)?.GetValue(lastValidItem)?.ToString() 
+                         ?? lastValidItem.Id.ToString();
+            
             items.RemoveAt(req.Limit);
         }
-
         return (items, nextCursor);
     }
+
 
 
 
