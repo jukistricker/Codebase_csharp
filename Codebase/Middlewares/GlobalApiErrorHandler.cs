@@ -106,7 +106,7 @@ public static class GlobalApiErrorHandler
             {
                 400 => ResponseCatalog.BadRequest,
                 401 => ResponseCatalog.Unauthorized,
-                403 => ResponseCatalog.NotFound, //tôi cố tình đấy
+                403 => ResponseCatalog.Forbidden, 
                 404 => ResponseCatalog.NotFound,
                 405 => ResponseCatalog.MethodNotAllowed,
                 406 => ResponseCatalog.NotAcceptable,

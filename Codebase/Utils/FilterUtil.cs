@@ -7,31 +7,32 @@ namespace Codebase.Utils;
 
 public static class FilterUtil
 {
-    // 1. ĐỊNH VỊ TRANG (Cursor Logic Only)
+    public static IQueryable<T> ApplyDeterministicSort<T>(this IQueryable<T> query, string fullSortParam)
+    {
+        return query.OrderBy(fullSortParam);
+    }
+
+    // Cursor: Dùng trực tiếp bool IsDescending để quyết định toán tử so sánh
     public static IQueryable<T> ApplyCursor<T, TCursor>(
         this IQueryable<T> query,
         string? cursor,
         string sortField,
-        bool isDescending) where T : class
+        bool isDescending = true) where T : class
     {
         if (string.IsNullOrEmpty(cursor)) return query;
 
         try
         {
             var converter = TypeDescriptor.GetConverter(typeof(TCursor));
-            var convertedCursor = (TCursor?)converter.ConvertFromString(cursor);
+            var convertedCursor = (TCursor?)converter.ConvertFromInvariantString(cursor);
 
             if (convertedCursor != null)
             {
                 var parameter = Expression.Parameter(typeof(T), "x");
-                var property = Expression.Call(
-                    typeof(EF),
-                    nameof(EF.Property),
-                    new[] { typeof(TCursor) },
-                    parameter,
-                    Expression.Constant(sortField));
+                var property = Expression.Call(typeof(EF), nameof(EF.Property), new[] { typeof(TCursor) }, 
+                    parameter, Expression.Constant(sortField));
 
-                // Định vị: Nếu Desc thì lấy những thằng nhỏ hơn Cursor, nếu Asc thì lớn hơn
+                // Triết lý: Nếu giảm dần (Desc) thì lấy nhỏ hơn Cursor, nếu tăng dần (Asc) thì lấy lớn hơn
                 var comparison = isDescending
                     ? Expression.LessThan(property, Expression.Constant(convertedCursor))
                     : Expression.GreaterThan(property, Expression.Constant(convertedCursor));
@@ -40,26 +41,7 @@ public static class FilterUtil
             }
         }
         catch { return query.Take(0); }
-
         return query;
-    }
-
-    // 2. SẮP XẾP ĐA CỘT (Deterministic Sort)
-    public static IQueryable<T> ApplyDeterministicSort<T>(this IQueryable<T> query, string? sort)
-    {
-        // Mặc định: Id giảm dần
-        if (string.IsNullOrWhiteSpace(sort)) return query.OrderBy("Id desc");
-
-        var isDescending = sort.StartsWith("-");
-        var field = sort.TrimStart('-');
-        var direction = isDescending ? "desc" : "asc";
-
-        // Luôn gán thêm Id vào cuối để đảm bảo thứ tự không đổi (Deterministic)
-        var sortExpression = field.Equals("Id", StringComparison.OrdinalIgnoreCase)
-            ? $"Id {direction}"
-            : $"{field} {direction}, Id {direction}";
-
-        return query.OrderBy(sortExpression);
     }
 
     // 3. CHỌN TRƯỜNG (Dynamic Projection)

@@ -1,6 +1,6 @@
 ﻿using System.Runtime.CompilerServices;
 using Codebase.Attributes;
-using Codebase.Models.Dtos.Requests.RBAC;
+using Codebase.Models.Dtos.Requests;
 using Codebase.Services.Interfaces.Rbac;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,4 +24,10 @@ public class RbacController:ControllerBase
         return await _rbacService.SavePermissionGroupAsync(request);
     }
     
+    [HttpGet]
+    [RequiredPermission("rbac.search_permission_groups")]
+    public async Task<IResult> SearchPermissionGroups([FromQuery] PermissionGroupFilterRequest request)
+    {        
+        return await _rbacService.SearchPermissionGroupsAsync(request);
+    }
 }

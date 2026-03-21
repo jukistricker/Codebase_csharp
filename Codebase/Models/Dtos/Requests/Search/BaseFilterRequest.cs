@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Codebase.Utils;
 
 namespace Codebase.Models.Dtos.Requests.Search;
@@ -5,32 +6,41 @@ namespace Codebase.Models.Dtos.Requests.Search;
 public class BaseFilterRequest
 {
     public string? Cursor { get; set; }
+    
+    [Range(1, 100, ErrorMessage = "filter.limit.range_1_100")]
     public int Limit { get; set; } = 20;
     public string? Search { get; set; } 
     public string? Select { get; set; }
-    public string? Sort { get; set; } = "-id"; 
+    public string? Sort { get; set; } = "Id";
+    public bool IsDescending { get; set; } = true; // Mặc định luôn là giảm dần
 
-    // 1. Lấy ra trường Sort đầu tiên (để làm mỏ neo cho Cursor)
-    public string PrimarySortField => Sort?.Split(',').FirstOrDefault()?.TrimStart('-') ?? "Id";
+    // 1. Lấy trường đầu tiên làm mỏ neo cho Cursor
+    public string PrimarySortField => Sort?.Split(',').FirstOrDefault()?.Trim() ?? "Id";
     public string SortField => StringUtil.ToPascalCase(PrimarySortField);
-    public bool IsDescending => Sort?.Split(',').FirstOrDefault()?.StartsWith("-") ?? true;
 
-    // 2. Chuyển đổi toàn bộ chuỗi Sort sang PascalCase (Hỗ trợ đa cột)
-    // Ví dụ: "-sortOrder,-id" -> "-SortOrder,-Id"
+    // 2. Tạo chuỗi FullSortParam đồng nhất một chiều
     public string FullSortParam 
     {
         get 
         {
-            if (string.IsNullOrWhiteSpace(Sort)) return "-Id";
+            string direction = IsDescending ? "desc" : "asc";
             
-            var parts = Sort.Split(',').Select(s => {
-                var isDesc = s.Trim().StartsWith("-");
-                var field = s.Trim().TrimStart('-');
-                var pascalField = StringUtil.ToPascalCase(field);
-                return isDesc ? $"-{pascalField}" : pascalField;
-            });
+            if (string.IsNullOrWhiteSpace(Sort)) return $"Id {direction}";
 
-            return string.Join(",", parts);
+            // Chuyển mọi trường trong Sort sang PascalCase và gắn hậu tố direction
+            var parts = Sort.Split(',', StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => $"{StringUtil.ToPascalCase(s.Trim())} {direction}")
+                .ToList();
+
+            // Luôn đảm bảo có Id ở cuối cùng chiều để Deterministic
+            if (!parts.Any(p => p.StartsWith("Id", StringComparison.OrdinalIgnoreCase)))
+            {
+                parts.Add($"Id {direction}");
+            }
+
+            return string.Join(", ", parts);
         }
     }
+    
+    
 }

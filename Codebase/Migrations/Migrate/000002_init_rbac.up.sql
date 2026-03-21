@@ -1,15 +1,13 @@
 ﻿-- 1. Thêm Group RBAC (Dùng để quản lý các quyền liên quan đến phân quyền)
 INSERT INTO public.permission_groups (name, code, sort_order)
-VALUES ('Quản lý phân quyền', 'rbac.group.admin', 1)
+VALUES ('RBAC Management', 'rbac_group.admin', 1)
     ON CONFLICT (code) DO NOTHING;
 -- Dùng ON CONFLICT để tránh lỗi nếu bạn lỡ chạy script này 2 lần
 
 -- 2. Thêm Permission hiện tại trong Controller và trỏ tới Group vừa tạo
 INSERT INTO public.permissions (code, permission_group_id)
-VALUES (
-           'rbac.save_permission_group',
-           (SELECT id FROM public.permission_groups WHERE code = 'rbac.group.admin' LIMIT 1)
-    )
+VALUES ('rbac.save_permission_group',(SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin' LIMIT 1)),
+        ('rbac.search_permission_groups',(SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin' LIMIT 1))
 ON CONFLICT (code) DO NOTHING;
 
 -- 2. Gán quyền rbac.save_permission_group cho Role Admin

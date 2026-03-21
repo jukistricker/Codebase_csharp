@@ -1,5 +1,5 @@
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Requests.RBAC;
+using Codebase.Models.Dtos.Requests;
 using Codebase.Models.Dtos.Responses;
 
 namespace Codebase.Repositories.Interfaces;

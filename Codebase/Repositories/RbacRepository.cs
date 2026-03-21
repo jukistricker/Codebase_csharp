@@ -1,7 +1,7 @@
 using System.Linq.Dynamic.Core;
 using Codebase.Contexts;
 using Codebase.Entities.Auth;
-using Codebase.Models.Dtos.Requests.RBAC;
+using Codebase.Models.Dtos.Requests;
 using Codebase.Models.Dtos.Responses;
 using Codebase.Repositories.Interfaces;
 using Codebase.Utils;

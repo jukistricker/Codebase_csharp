@@ -84,7 +84,7 @@ public class RolePermissionMiddleware
         {
             if (!session.Permissions.Contains(requiredPermission))
             {
-                await ReturnError(context, ResponseCatalog.Forbidden); return;
+                await ReturnError(context, ResponseCatalog.NotFound); return;
             }
         }
         context.Items["Jti"] = jti;
