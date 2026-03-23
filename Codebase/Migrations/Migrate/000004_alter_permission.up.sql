@@ -13,5 +13,7 @@ VALUES
     ('user.update', 'Update User''s Details', (SELECT id FROM public.permission_groups WHERE code = 'user_group')),
     ('user.delete', 'Delete User', (SELECT id FROM public.permission_groups WHERE code = 'user_group')),
 
-    ('rbac.save_permission_group', 'Save Permission Group', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin'))
+    ('rbac.save_permission_group', 'Save Permission Group', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
+    ('rbac.save_role', 'Save Role', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
+    ('rbac.search_roles', 'Search Roles', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin'))
     ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;

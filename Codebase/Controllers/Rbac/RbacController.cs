@@ -1,6 +1,7 @@
 ﻿using System.Runtime.CompilerServices;
 using Codebase.Attributes;
 using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Requests.Search;
 using Codebase.Services.Interfaces.Rbac;
 using Microsoft.AspNetCore.Mvc;
 
@@ -17,17 +18,45 @@ public class RbacController:ControllerBase
         _rbacService = rbacService;
     }
 
-    [HttpPost("")]
+    [HttpPost("permission-group")]  
     [RequiredPermission("rbac.save_permission_group")]
-    public async Task<IResult> SavePermission([FromBody] PermissionGroupPostRequest request)
+    public async Task<IResult> CreatePermissionGroup([FromBody] PermissionGroupSaveRequest request)
     {
-        return await _rbacService.SavePermissionGroupAsync(request);
+        return await _rbacService.CreatePermissionGroupAsync(request);
     }
     
-    [HttpGet]
+    [HttpPut("permission-group")]  
+    [RequiredPermission("rbac.save_permission_group")]
+    public async Task<IResult> UpdatePermissionGroup([FromBody] PermissionGroupSaveRequest request)
+    {
+        return await _rbacService.UpdatePermissionGroupAsync(request);
+    }
+    
+    [HttpGet("permission-groups")]
     [RequiredPermission("rbac.search_permission_groups")]
     public async Task<IResult> SearchPermissionGroups([FromQuery] PermissionGroupFilterRequest request)
     {        
         return await _rbacService.SearchPermissionGroupsAsync(request);
+    }
+    
+    [HttpPost("role")]  
+    [RequiredPermission("rbac.save_role")]
+    public async Task<IResult> CreateRole([FromBody] RoleSaveRequest request)
+    {
+        return await _rbacService.CreateRoleAsync(request);
+    }
+    
+    [HttpPut("role")]  
+    [RequiredPermission("rbac.save_role")]
+    public async Task<IResult> UpdateRole([FromBody] RoleSaveRequest request)
+    {
+        return await _rbacService.UpdateRoleAsync(request);
+    }
+    
+    [HttpGet("roles")]
+    [RequiredPermission("rbac.search_roles")]
+    public async Task<IResult> SearchRoles([FromQuery] RoleFilterRequest request)
+    {        
+        return await _rbacService.SearchRolesAsync(request);
     }
 }

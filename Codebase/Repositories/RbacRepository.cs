@@ -2,6 +2,7 @@ using System.Linq.Dynamic.Core;
 using Codebase.Contexts;
 using Codebase.Entities.Auth;
 using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Requests.Search;
 using Codebase.Models.Dtos.Responses;
 using Codebase.Repositories.Interfaces;
 using Codebase.Utils;
@@ -54,7 +55,6 @@ public class RbacRepository : IRbacRepository
         {
             _db.PermissionGroups.Add(entity);
         }
-
         // Đẩy xuống DB 
         // Lỗi Unique/Concurrency sẽ sinh tại đây và bay thẳng lên GEH
         await _db.SaveChangesAsync();
@@ -142,6 +142,50 @@ public class RbacRepository : IRbacRepository
 
     public async Task<bool> SaveChangesAsync() 
         => await _db.SaveChangesAsync() > 0;
+
+    public async Task<Role> SaveRoleAsync(Role entity, bool isUpdate)
+    {
+        if (isUpdate)
+        {
+            _db.Roles.Attach(entity);
+            _db.Entry(entity).State = EntityState.Modified;
+        }
+        else
+        {
+            _db.Roles.Add(entity);
+        }
+        await _db.SaveChangesAsync();
+        return entity;
+    }
+
+    public async Task<(List<Role> Items, string? NextCursor)> GetRolesAsync(RoleFilterRequest requests)
+    {
+        IQueryable<Role> query = _db.Roles.AsNoTracking();
+
+        if (requests.Id.HasValue) query = query.Where(u => u.Id == requests.Id.Value);
+        if (!string.IsNullOrWhiteSpace(requests.Search))
+        {
+            query = query.Where(u => EF.Functions.ILike(u.Name, $"%{requests.Search.Trim()}%"));
+        }
+        
+        List<Role> items = await query
+            .ApplyCursor<Role, Guid>(requests.Cursor, requests.SortField, requests.IsDescending) 
+            .ApplyDeterministicSort(requests.FullSortParam)
+            .Take(requests.Limit + 1)
+            .ApplySelect<Role, Role>(StringUtil.GetSelectFields<Role>(requests.Select))
+            .ToListAsync();
+
+        string? nextCursor = null;
+        if (items.Count > requests.Limit)
+        {
+            Role lastValidItem = items[requests.Limit - 1];
+            nextCursor = lastValidItem.GetType().GetProperty(requests.SortField)?.GetValue(lastValidItem)?.ToString() 
+                         ?? lastValidItem.Id.ToString();
+            
+            items.RemoveAt(requests.Limit);
+        }
+        return (items, nextCursor);
+    }
 
     public async Task<List<PermissionGroup>> GetAllGroupsAsync()
         => await _db.PermissionGroups.AsNoTracking().OrderBy(x => x.SortOrder).ToListAsync();

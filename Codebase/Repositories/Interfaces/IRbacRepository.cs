@@ -1,5 +1,6 @@
 using Codebase.Entities.Auth;
 using Codebase.Models.Dtos.Requests;
+using Codebase.Models.Dtos.Requests.Search;
 using Codebase.Models.Dtos.Responses;
 
 namespace Codebase.Repositories.Interfaces;
@@ -18,4 +19,6 @@ public interface IRbacRepository
     void Delete<T>(T entity) where T : class;
     Task UpdateRolePermissionsAsync(Guid roleId, List<Guid> permissionIds);
     Task<bool> SaveChangesAsync();
+    Task<Role> SaveRoleAsync(Role entity, bool isUpdate);
+    Task<(List<Role> Items, string? NextCursor)> GetRolesAsync(RoleFilterRequest request);
 }
