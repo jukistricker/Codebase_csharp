@@ -46,7 +46,7 @@ public class AuthController : ControllerBase
     }
     
     [HttpGet]
-    [RequiredPermission("auth.view_users")]
+    [RequiredPermission("user.view_users")]
     public async Task<IResult> GetAll([FromQuery] AuthFilterRequest req)
     {
         return await _authService.GetUsersAsync(req);
