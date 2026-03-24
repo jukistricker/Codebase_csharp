@@ -21,7 +21,7 @@ public class RbacService : IRbacService
     public async Task<IResult> CreatePermissionGroupAsync(PermissionGroupSaveRequest request)
     {
         PermissionGroup entity = request.ToEntity();
-        request.Id = Guid.Empty;
+        entity.Id = Guid.Empty;
         entity= await _rbacRepo.SavePermissionGroupAsync(entity, false);
         return ResponseDto.Create(ResponseCatalog.Created, "rbac.permission_group.created",entity);
     }
@@ -48,7 +48,7 @@ public class RbacService : IRbacService
     public async Task<IResult> CreateRoleAsync(RoleSaveRequest request)
     {
         Role entity = request.ToEntity();
-        request.Id = Guid.Empty;
+        entity.Id = Guid.Empty;
         entity= await _rbacRepo.SaveRoleAsync(entity, false);
         return ResponseDto.Create(ResponseCatalog.Created, "rbac.role.created",entity);
     }
@@ -69,5 +69,77 @@ public class RbacService : IRbacService
 
         PagedResponse<Role> response= new PagedResponse<Role>(items, nextCursor);
         return ResponseDto.Create(ResponseCatalog.Success, "rbac.role_list", response);
+    }
+
+    public async Task<IResult> CreatePermissionAsync(List<PermissionSaveRequest> requests)
+{
+    // 1. Thu thập tất cả các ID/Code cần kiểm tra để tối ưu Round-trip
+    var codesToCheck = requests.Select(r => r.Code).Distinct().ToList();
+    var groupIdsToCheck = requests.Select(r => r.PermissionGroupId).Distinct().ToList();
+    var roleIdsToCheck = requests.Select(r => r.RoleId).Distinct().ToList();
+
+    // 2. Một lượt quét Database để lấy toàn bộ dữ liệu đối chiếu
+    var existingCodes = await _rbacRepo.ValidPermissionCodes(codesToCheck);
+
+    var validGroupIds = await _rbacRepo.ValidPermissionGroups(groupIdsToCheck);
+
+    var validRoleIds = await _rbacRepo.ValidRoles(roleIdsToCheck);
+
+    // 3. Duyệt qua từng request để "bắt lỗi"
+    var errorList = new List<object>();
+    var duplicateInRequest = requests.GroupBy(x => x.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+
+    foreach (var req in requests)
+    {
+        var itemErrors = new List<string>();
+
+        if (existingCodes.Contains(req.Code)) itemErrors.Add("rbac.permission.code_already_exists");
+        if (duplicateInRequest.Contains(req.Code)) itemErrors.Add("rbac.request.duplicate_code");
+        if (!validGroupIds.Contains(req.PermissionGroupId)) itemErrors.Add("rbac.group.not_found");
+        if (!validRoleIds.Contains(req.RoleId)) itemErrors.Add("rbac.role.not_found");
+
+        if (itemErrors.Any())
+        {
+            errorList.Add(new { 
+                req.Code, 
+                req.Name, 
+                Errors = itemErrors 
+            });
+        }
+    }
+
+    // --- CHỐT CHẶN CUỐI CÙNG ---
+    if (errorList.Any())
+    {
+        return Results.BadRequest(new { 
+            Message = "rbac.save_failed_logic_errors", 
+            Details = errorList 
+        });
+    }
+
+    // 4. Nếu pass hết mới map và gọi Repo lưu 1 lần (Batch)
+    var permissions = requests.Select(r => new Permission {
+        Id = r.Id ?? Guid.CreateVersion7(),
+        Code = r.Code,
+        Name = r.Name,
+        PermissionGroupId = r.PermissionGroupId
+    }).ToList();
+
+    var rolePermissions = requests.Select((r, i) => new RolePermission {
+        PermissionId = permissions[i].Id,
+        RoleId = r.RoleId
+    }).ToList();
+
+    if(!await _rbacRepo.SavePermissionBatchAsync(permissions, rolePermissions)
+    {
+        return ResponseDto.Create(ResponseCatalog.Internal,"rbac.permissionsave_failed_db_error");
+    })
+
+    return Results.Ok(new { Message = "rbac.save_success", Count = requests.Count });
+}
+
+    public async Task<IResult> UpdatePermissionAsync(List<PermissionSaveRequest> request)
+    {
+        throw new NotImplementedException();
     }
 }

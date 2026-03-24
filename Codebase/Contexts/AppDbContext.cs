@@ -55,8 +55,6 @@ public class AppDbContext : DbContext
         }
     }
 
-    
-
     public override int SaveChanges()
     {
         ApplyAuditLog();
@@ -108,25 +106,24 @@ public class AppDbContext : DbContext
 
     private void SetAuditUser(EntityEntry entry, string propName, string? rawUserId)
     {
-        var prop = entry.Property(propName);
-        var targetType = prop.Metadata.ClrType;
+        PropertyEntry prop = entry.Property(propName);
+    
+        // Lấy kiểu thực sự bên dưới (nếu là Guid? thì lấy Guid)
+        Type targetType = Nullable.GetUnderlyingType(prop.Metadata.ClrType) ?? prop.Metadata.ClrType;
 
-        // A. Nếu có Token (User đã đăng nhập)
-        if (!string.IsNullOrEmpty(rawUserId))
+        if (targetType == typeof(Guid))
         {
-            // Chuyển đổi linh hoạt sang bất kỳ kiểu dữ liệu nào (Guid, int, long, string)
-            var convertedId = targetType == typeof(Guid)
-                ? Guid.Parse(rawUserId)
-                : Convert.ChangeType(rawUserId, targetType);
-
-            prop.CurrentValue = convertedId;
+            // Nếu có Token và Parse được thành Guid
+            if (Guid.TryParse(rawUserId, out Guid userId))
+            {
+                prop.CurrentValue = userId;
+            }
+            // Nếu không có Token (Trường hợp SignUp hoặc System chạy ngầm)
+            else
+            {
+                
+                // prop.CurrentValue = null; 
+            }
         }
-        // B. Nếu không có Token (Trường hợp SignUp)
-        // else if (isNew && propName == "CreatedBy")
-        // {
-        //     // Gán CreatedBy = Id của chính bản ghi đó
-        //     // Cách này hoạt động cho mọi kiểu dữ liệu của Id
-        //     prop.CurrentValue = entry.Property("Id").CurrentValue;
-        // }
     }
 }

@@ -18,9 +18,9 @@ public sealed class TokenUtil
     public TokenUtil(IConfiguration config)
     {
         _secretKey = config["Jwt:SecretKey"] ?? throw new ArgumentNullException("Jwt SecretKey missing");
-        _issuer = config["Jwt:Issuer"] ?? "CodebaseIssuer";
-        _audience = config["Jwt:Audience"] ?? "CodebaseAudience";
-        _expireMinutes = int.Parse(config["Jwt:ExpireMinutes"] ?? "15"); 
+        _issuer = config["Jwt:Issuer"] ?? throw new ArgumentNullException("Jwt Issuer missing") ;
+        _audience = config["Jwt:Audience"] ?? throw new ArgumentNullException("Jwt Audience missing") ;
+        _expireMinutes = int.Parse(config["Jwt:ExpireMinutes"] ?? "1440"); 
         _handler = new JsonWebTokenHandler(); 
         
         _validationParameters = new TokenValidationParameters
@@ -28,9 +28,9 @@ public sealed class TokenUtil
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:SecretKey"]!)),
             ValidateIssuer = true,
-            ValidIssuer = config["Jwt:Issuer"] ?? "CodebaseIssuer",
+            ValidIssuer = config["Jwt:Issuer"] ,
             ValidateAudience = true,
-            ValidAudience = config["Jwt:Audience"] ?? "CodebaseAudience",
+            ValidAudience = config["Jwt:Audience"] ,
             ValidateLifetime = true,
             ClockSkew = TimeSpan.Zero
         };

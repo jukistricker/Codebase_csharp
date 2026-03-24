@@ -59,4 +59,25 @@ public class RbacController:ControllerBase
     {        
         return await _rbacService.SearchRolesAsync(request);
     }
+    
+    [HttpPost("permission")]  
+    [RequiredPermission("rbac.save_permission")]
+    public async Task<IResult> CreatePermission([FromBody] List<PermissionSaveRequest> request)
+    {
+        return await _rbacService.CreatePermissionAsync(request);
+    }
+    
+    [HttpPut("permission")]  
+    [RequiredPermission("rbac.save_permission")]
+    public async Task<IResult> UpdatePermission([FromBody] List<PermissionSaveRequest> request)
+    {
+        return await _rbacService.UpdatePermissionAsync(request);
+    }
+    
+    [HttpGet("permissions")]
+    [RequiredPermission("rbac.search_permissions")]
+    public async Task<IResult> SearchPermissions([FromQuery] PermissionFilterRequest request)
+    {        
+        return await _rbacService.SearchPermissionsAsync(request);
+    }
 }
