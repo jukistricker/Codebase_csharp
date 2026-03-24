@@ -25,4 +25,7 @@ public interface IRbacRepository
     Task<List<Guid>> ValidPermissionGroups(List<Guid> groupIds);
     Task<List<Guid>> ValidRoles(List<Guid> roleIds);
     Task<bool> SavePermissionBatchAsync(List<Permission> permissions, List<RolePermission> rolePermissions);
+    Task<List<Permission>> GetPermissionsByIds(List<Guid> ids);
+    Task<bool> UpsertPermissionsBatchAsync(List<Guid> idsToUpdate, List<Permission> permissions, List<RolePermission> rolePermissions);
+    Task<(List<PermissionResponse> Items, string? NextCursor)> GetPermissionsAsync(PermissionFilterRequest request);
 }

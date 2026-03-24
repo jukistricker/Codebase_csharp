@@ -13,4 +13,5 @@ public interface IRbacService
     Task<IResult> SearchRolesAsync(RoleFilterRequest request);
     Task<IResult> CreatePermissionAsync(List<PermissionSaveRequest> request);
     Task<IResult> UpdatePermissionAsync(List<PermissionSaveRequest> request);
+    Task<IResult> SearchPermissionsAsync(PermissionFilterRequest request);
 }

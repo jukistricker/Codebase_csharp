@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Codebase.Entities.Auth;
 using Codebase.Models.Dtos.Requests.Search;
+using Codebase.Models.Dtos.Responses.Shared;
 
 namespace Codebase.Models.Dtos.Requests;
 
@@ -71,10 +72,16 @@ public class PermissionSaveRequest
     [Required(ErrorMessage = "rbac.permission.code_required")]
     public string Code { get; set; }
     
-    [Required(ErrorMessage = "rbac.permission.group_required")]
-    public Guid PermissionGroupId { get; set; }
+    public Guid? PermissionGroupId { get; set; }
     
-    [Required(ErrorMessage = "rbac.permission.role_required")]
-    public Guid RoleId { get; set; }
+    public List<Guid>? RoleId { get; set; }
     
+}
+
+public class PermissionFilterRequest:BaseFilterRequest
+{
+    public Guid? Id { get; set; }
+    public string? Code { get; set; }
+    public Guid? PermissionGroupId { get; set; }
+    public Guid? RoleId { get; set; }
 }

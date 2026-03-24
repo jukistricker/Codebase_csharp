@@ -15,5 +15,25 @@ VALUES
 
     ('rbac.save_permission_group', 'Save Permission Group', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
     ('rbac.save_role', 'Save Role', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
-    ('rbac.search_roles', 'Search Roles', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin'))
+    ('rbac.search_roles', 'Search Roles', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
+    ('rbac.save_permission', 'Save Permissions', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
+    ('rbac.search_permissions', 'Search Permissions', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
+    ('rbac.search_permission_groups','Search Permission Groups', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin'))
+
     ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
+
+INSERT INTO public.role_permissions (role_id, permission_id)
+SELECT
+    (SELECT id FROM public.roles WHERE name = 'admin' LIMIT 1), -- Lấy ID của role admin
+    p.id
+FROM public.permissions p
+WHERE p.code IN (
+    'rbac.search_permission_groups',
+    'rbac.save_permission_group',
+    'rbac.save_role',
+    'rbac.search_roles',
+    'rbac.save_permission',
+    'rbac.search_permissions'
+    )
+-- Đảm bảo không chèn trùng nếu bản ghi đã tồn tại
+ON CONFLICT (role_id, permission_id) DO NOTHING;
