@@ -21,4 +21,8 @@ public interface IRbacRepository
     Task<bool> SaveChangesAsync();
     Task<Role> SaveRoleAsync(Role entity, bool isUpdate);
     Task<(List<Role> Items, string? NextCursor)> GetRolesAsync(RoleFilterRequest request);
+    Task<List<string>> ValidPermissionCodes(List<string> codes);
+    Task<List<Guid>> ValidPermissionGroups(List<Guid> groupIds);
+    Task<List<Guid>> ValidRoles(List<Guid> roleIds);
+    Task<bool> SavePermissionBatchAsync(List<Permission> permissions, List<RolePermission> rolePermissions);
 }

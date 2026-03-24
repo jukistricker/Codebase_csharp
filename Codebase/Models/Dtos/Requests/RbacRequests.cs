@@ -60,3 +60,21 @@ public class RoleFilterRequest : BaseFilterRequest
 {
     public Guid? Id { get; set; }
 }
+
+public class PermissionSaveRequest
+{
+    public Guid? Id { get; set; }
+    
+    [Required(ErrorMessage = "rbac.role.name_required")]
+    public string Name { get; set; }
+    
+    [Required(ErrorMessage = "rbac.permission.code_required")]
+    public string Code { get; set; }
+    
+    [Required(ErrorMessage = "rbac.permission.group_required")]
+    public Guid PermissionGroupId { get; set; }
+    
+    [Required(ErrorMessage = "rbac.permission.role_required")]
+    public Guid RoleId { get; set; }
+    
+}

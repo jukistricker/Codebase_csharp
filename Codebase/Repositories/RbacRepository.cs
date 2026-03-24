@@ -14,8 +14,13 @@ public class RbacRepository : IRbacRepository
 {
     
     private readonly AppDbContext _db;
+    private readonly ILogger<RbacRepository> _logger;
 
-    public RbacRepository(AppDbContext context) => _db = context;
+    public RbacRepository(AppDbContext context, ILogger<RbacRepository> logger)
+    {
+        _db = context;
+        _logger = logger;
+    }
 
     // public async Task<PermissionGroupDetailDto?> GetGroupPermissionDetailAsync(Guid groupPermissionId)
     // {
@@ -126,6 +131,45 @@ public class RbacRepository : IRbacRepository
             await _db.RolePermissions.AddRangeAsync(newItems);
             await _db.SaveChangesAsync();
         }
+    }
+    
+    public async Task<bool> SavePermissionBatchAsync(List<Permission> permissions, List<RolePermission> rolePermissions)
+    {
+        try 
+        {
+            await _db.Permissions.AddRangeAsync(permissions);
+            await _db.RolePermissions.AddRangeAsync(rolePermissions);
+            return await _db.SaveChangesAsync() > 0;
+        }
+        catch (Exception ex) 
+        {
+            _logger.LogError(ex, "Internal Server Error. Details: {Message}", 
+                ex.InnerException?.Message ?? ex.Message);
+            // Dọn dẹp tracker nếu lưu thất bại để tránh ảnh hưởng các lệnh Save sau này
+            _db.ChangeTracker.Clear(); 
+            return false; 
+        }
+    }
+    
+    public async Task<List<string>> ValidPermissionCodes(List<string> codes)
+    {
+        return await _db.Permissions
+            .Where(p => codes.Contains(p.Code))
+            .Select(p => p.Code).ToListAsync();
+    }
+    
+    public async Task<List<Guid>> ValidPermissionGroups(List<Guid> groupIds)
+    {
+        return await _db.PermissionGroups
+            .Where(g => groupIds.Contains(g.Id))
+            .Select(g => g.Id).ToListAsync();
+    }
+    
+    public async Task<List<Guid>> ValidRoles(List<Guid> roleIds)
+    {
+        return await _db.Roles
+            .Where(r => roleIds.Contains(r.Id))
+            .Select(r => r.Id).ToListAsync();
     }
     
     public Task Update<T>(T entity) where T : class
