@@ -30,4 +30,9 @@ public class SessionRepository : ISessionRepository
     {
         return _redisDb.KeyDeleteAsync($"{KeyPrefix}{token}");
     }
+
+    public async Task<UserSession?> GetAsync(string jti)
+    {
+        return await RedisUtil.GetObjectFromJsonAsync<UserSession>(_redisDb,$"{KeyPrefix}{jti}");
+    }
 }

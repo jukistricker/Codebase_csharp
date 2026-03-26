@@ -37,7 +37,7 @@ public class AuthController : ControllerBase
     [RequiredPermission("auth.logout")]
     public async Task<IResult> LogOut()
     {
-        string jti = HttpContext.GetJti();
+        string? jti = HttpContext.GetJti();
         if (jti == null)
         {
             return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.jti_not_found");
@@ -51,5 +51,17 @@ public class AuthController : ControllerBase
     {
         return await _authService.GetUsersAsync(req);
         
+    }
+
+    [HttpGet("session")]
+    [RequiredPermission("auth.view_session")]
+    public async Task<IResult> GetSession()
+    {
+        string? jti = HttpContext.GetJti();
+        if (jti == null)
+        {
+            return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.jti_not_found");
+        }
+        return await _authService.GetPermissionAsync(jti);
     }
 }

@@ -153,35 +153,35 @@ public class RbacService : IRbacService
     public async Task<IResult> UpdatePermissionAsync(List<PermissionSaveRequest> requests)
     {
         // 1. Thu thập dữ liệu để check
-        var idsInRequest = requests.Where(r => r.Id.HasValue).Select(r => r.Id!.Value).ToList();
-        var codesInRequest = requests.Select(r => r.Code).Distinct().ToList();
+        List<Guid> permissionIdsInRequest = requests.Where(r => r.Id.HasValue).Select(r => r.Id!.Value).ToList();
+        List<string> codesInRequest = requests.Select(r => r.Code).Distinct().ToList();
 
         // Thu thập GroupId (Xử lý null để tránh lỗi Select)
-        var groupIdsToCheck = requests
+        List<Guid> groupIdsToCheck = requests
             .Where(r => r.PermissionGroupId.HasValue)
             .Select(r => r.PermissionGroupId!.Value)
             .Distinct().ToList();
 
         // Thu thập RoleId (Xử lý null để SelectMany không crash)
-        var roleIdsToCheck = requests
+        List<Guid> roleIdsToCheck = requests
             .SelectMany(r => r.RoleId ?? new List<Guid>())
             .Distinct().ToList();
 
         // 2. Quét DB một lần duy nhất
-        var existingInDb = await _rbacRepo.GetPermissionsByIds(idsInRequest);
-        var existingCodes = await _rbacRepo.ValidPermissionCodes(codesInRequest);
-        var validGroupIds = await _rbacRepo.ValidPermissionGroups(groupIdsToCheck);
-        var validRoleIds = roleIdsToCheck.Any()
+        List<Permission> existingInDb = await _rbacRepo.GetPermissionsByIds(permissionIdsInRequest);
+        List<string> existingCodes = await _rbacRepo.ValidPermissionCodes(codesInRequest);
+        List<Guid> validGroupIds = await _rbacRepo.ValidPermissionGroups(groupIdsToCheck);
+        List<Guid> validRoleIds = roleIdsToCheck.Any()
             ? await _rbacRepo.ValidRoles(roleIdsToCheck)
             : new List<Guid>();
 
         // 3. Bắt lỗi logic
-        var errorList = new List<object>();
-        var duplicateInRequest = requests.GroupBy(x => x.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
+        List<object> errorList = new List<object>();
+        List<string> duplicateInRequest = requests.GroupBy(x => x.Code).Where(g => g.Count() > 1).Select(g => g.Key).ToList();
 
-        foreach (var req in requests)
+        foreach (PermissionSaveRequest req in requests)
         {
-            var itemErrors = new List<string>();
+            List<string> itemErrors = new List<string>();
 
             // Check tồn tại Permission
             if (req.Id.HasValue && !existingInDb.Any(p => p.Id == req.Id))
@@ -194,7 +194,7 @@ public class RbacService : IRbacService
             // Check trùng Code (trừ chính nó)
             if (existingCodes.Contains(req.Code))
             {
-                var isOwnCode = req.Id.HasValue && existingInDb.Any(p => p.Id == req.Id && p.Code == req.Code);
+                bool isOwnCode = req.Id.HasValue && existingInDb.Any(p => p.Id == req.Id && p.Code == req.Code);
                 if (!isOwnCode) itemErrors.Add("rbac.permission.code_already_exists");
             }
 
@@ -212,13 +212,13 @@ public class RbacService : IRbacService
             return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.permission.save_failed", errorList);
 
         // 4. Phân loại để Upsert
-        var permissionsToSave = new List<Permission>();
-        var rolePermissionsToSave = new List<RolePermission>();
+        List<Permission> permissionsToSave = new List<Permission>();
+        List<RolePermission> rolePermissionsToSave = new List<RolePermission>();
 
-        foreach (var req in requests)
+        foreach (PermissionSaveRequest req in requests)
         {
-            var isUpdate = req.Id.HasValue && existingInDb.Any(p => p.Id == req.Id);
-            var pId = isUpdate ? req.Id!.Value : req.Id ?? Guid.CreateVersion7();
+            bool isUpdate = req.Id.HasValue && existingInDb.Any(p => p.Id == req.Id);
+            Guid pId = isUpdate ? req.Id!.Value : req.Id ?? Guid.CreateVersion7();
 
             permissionsToSave.Add(new Permission
             {
@@ -238,8 +238,8 @@ public class RbacService : IRbacService
                 }));
         }
 
-        // 5. Lưu xuống Repo: idsInRequest chứa tất cả các ID cần được "làm sạch" bảng trung gian
-        if (!await _rbacRepo.UpsertPermissionsBatchAsync(idsInRequest, permissionsToSave, rolePermissionsToSave))
+        // 5. Lưu xuống Repo: idsInRequest chứa tất cả các ID cần được l
+        if (!await _rbacRepo.UpsertPermissionsBatchAsync(permissionIdsInRequest, permissionsToSave, rolePermissionsToSave))
             return ResponseDto.Create(ResponseCatalog.Internal, "rbac.permission.save_failed");
 
         return ResponseDto.Create(ResponseCatalog.Success, "rbac.permission.update_success");

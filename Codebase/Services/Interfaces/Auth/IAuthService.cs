@@ -8,4 +8,5 @@ public interface IAuthService
     Task<IResult> SignInAsync(SignInDto dto);
     Task<IResult> SignOutAsync(string jti);
     Task<IResult> GetUsersAsync(AuthFilterRequest req);
+    Task<IResult> GetPermissionAsync(string jti);
 }

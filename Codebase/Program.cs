@@ -11,12 +11,23 @@ using Codebase.Services.Rbac;
 using Codebase.Utils;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using StackExchange.Redis;
 using Prometheus;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.WebHost.ConfigureKestrel(options =>
+{
+    
+    options.ListenLocalhost(7226, listenOptions =>
+    {
+        listenOptions.Protocols = HttpProtocols.Http1AndHttp2AndHttp3;
+        listenOptions.UseHttps(); 
+    });
+});
 
 // PostgreSQL
 builder.Services.AddDbContext<AppDbContext>(opt=>{
@@ -103,6 +114,21 @@ builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddAuthorization();
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    // Log giao thức của request hiện tại ra Console
+    Console.WriteLine($"[Request] Protocol: {context.Request.Protocol} | Path: {context.Request.Path}");
+    
+    // Đảm bảo luôn gửi Header quảng cáo QUIC
+    // ma=31536000: Bảo trình duyệt nhớ trong 1 năm
+    // persist=1: Nhớ ngay cả khi máy tính khởi động lại hoặc đổi mạng wifi
+    context.Response.Headers.Append("Alt-Svc", "h3=\":7226\"; ma=31536000; persist=1");
+    
+    // HSTS: Ép trình duyệt luôn dùng HTTPS (QUIC bắt buộc HTTPS)
+    context.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    await next();
+});
 
 var accessor = app.Services.GetRequiredService<IHttpContextAccessor>();
 HttpContextUtil.Configure(accessor);
