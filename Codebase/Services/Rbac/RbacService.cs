@@ -252,4 +252,48 @@ public class RbacService : IRbacService
         var response = new PagedResponse<PermissionResponse>(items, nextCursor);
         return ResponseDto.Create(ResponseCatalog.Success, "rbac.permission.list", response);
     }
+
+    public async Task<IResult> AssignRoleAsync(UserRoleAssignRequest request)
+    {
+        // 1. Đọc 1 lần duy nhất
+        var existingUserRoles = await _rbacRepo.GetUserRolesAsync(request.UserId);
+        var existingRoleIds = existingUserRoles.Select(ur => ur.RoleId).ToHashSet();
+        var errors = new List<string>();
+
+        // 2. Check Giao thoa
+        var intersection = request.AddRoleIds?.Intersect(request.RemoveRoleIds ?? new HashSet<Guid>()).ToList();
+        if (intersection?.Any() == true)
+            return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.duplicate_in_add_and_remove", intersection);
+
+        // 3. Xử lý Xóa
+        if (request.RemoveRoleIds != null)
+        {
+            foreach (var roleId in request.RemoveRoleIds)
+            {
+                var toRemove = existingUserRoles.FirstOrDefault(ur => ur.RoleId == roleId);
+                if (toRemove == null) errors.Add($"Role {roleId} does not exist for user.");
+                else _rbacRepo.Remove(toRemove);
+            }
+        }
+
+        // 4. Xử lý Thêm
+        if (request.AddRoleIds != null)
+        {
+            foreach (var roleId in request.AddRoleIds)
+            {
+                if (existingRoleIds.Contains(roleId)) errors.Add($"Role {roleId} already assigned to user.");
+                else _rbacRepo.Add(new UserRole { UserId = request.UserId, RoleId = roleId }); 
+            }
+        }
+
+        // Nếu có bất kỳ lỗi nào, trả về cả tập hợp lỗi luôn
+        if (errors.Any()) 
+            return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.validate_failed", errors);
+
+        // 5. Ghi 1 lần duy nhất
+        await _rbacRepo.SaveChangesAsync();
+
+        return ResponseDto.Create(ResponseCatalog.Success, "rbac.user_role.assign_success");
+    }
+    
 }
