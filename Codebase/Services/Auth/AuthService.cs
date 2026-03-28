@@ -120,6 +120,15 @@ public class AuthService : IAuthService
         PagedResponse<UserResponse> response= new PagedResponse<UserResponse>(items, nextCursor);
         return ResponseDto.Create(ResponseCatalog.Success, "auth.users_list", response);
     }
-    
-    
+
+    public async Task<IResult> GetPermissionAsync(string jti)
+    {
+        UserSession? session = await _sessionRepo.GetAsync(jti);
+        if (session == null)
+        {
+            return ResponseDto.Create(ResponseCatalog.Unauthorized, "auth.session_not_found");
+        }
+
+        return ResponseDto.Create(ResponseCatalog.Success, "auth.session_info", session.Permissions);
+    }
 }

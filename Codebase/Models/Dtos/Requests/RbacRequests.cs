@@ -85,3 +85,13 @@ public class PermissionFilterRequest:BaseFilterRequest
     public Guid? PermissionGroupId { get; set; }
     public Guid? RoleId { get; set; }
 }
+
+public class UserRoleAssignRequest
+{
+    [Required(ErrorMessage = "rbac.user_role.user_id_required")]
+    public Guid UserId { get; set; }
+    
+    public ISet<Guid>? AddRoleIds { get; set; }
+    
+    public ISet<Guid>? RemoveRoleIds { get; set; }
+}

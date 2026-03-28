@@ -280,10 +280,22 @@ public class RbacRepository : IRbacRepository
         return (items, nextCursor);
     }
 
+    public async Task<List<UserRole>> GetUserRolesAsync(Guid userId)
+    {
+        return await _db.UserRoles
+            .Where(ur => ur.UserId == userId)
+            .ToListAsync();
+    }
+
     public Task Update<T>(T entity) where T : class
     {
         _db.Set<T>().Update(entity);
         return Task.CompletedTask;
+    }
+
+    public void Add<T>(T entity) where T : class
+    {
+        _db.Set<T>().Add(entity);
     }
 
     public async Task AddAsync<T>(T entity) where T : class
@@ -299,6 +311,11 @@ public class RbacRepository : IRbacRepository
     public async Task<bool> SaveChangesAsync()
     {
         return await _db.SaveChangesAsync() > 0;
+    }
+    
+    public void Remove<T>(T entity) where T : class
+    {
+        _db.Set<T>().Remove(entity);
     }
 
     public async Task<Role> SaveRoleAsync(Role entity, bool isUpdate)

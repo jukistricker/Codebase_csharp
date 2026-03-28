@@ -80,4 +80,10 @@ public class RbacController:ControllerBase
     {        
         return await _rbacService.SearchPermissionsAsync(request);
     }
+    
+    [HttpPut("assign-role")]
+    [RequiredPermission("rbac.assign_role")]
+    public async Task<IResult> AssignRole([FromBody] UserRoleAssignRequest request)
+    {        return await _rbacService.AssignRoleAsync(request);
+    }
 }
