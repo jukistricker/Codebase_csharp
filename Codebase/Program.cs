@@ -113,7 +113,26 @@ builder.Services.AddSingleton<TokenUtil>();
 builder.Services.AddSingleton<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddAuthorization();
+
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MultiPlatformPolicy", policy =>
+    {
+        policy.WithOrigins(allowedOrigins ?? new[] { "http://localhost:3000" }) // Fallback nếu quên cấu hình
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials(); // Quan trọng: Cho phép gửi Cookie/Auth Header
+    });
+});
+
 var app = builder.Build();
+
+app.UseRouting();
+
+// Phải nằm SAU UseRouting và TRƯỚC UseAuthorization
+app.UseCors("MultiPlatformPolicy");
 
 app.Use(async (context, next) =>
 {

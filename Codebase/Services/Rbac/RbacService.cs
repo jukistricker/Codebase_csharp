@@ -255,42 +255,47 @@ public class RbacService : IRbacService
 
     public async Task<IResult> AssignRoleAsync(UserRoleAssignRequest request)
     {
-        // 1. Đọc 1 lần duy nhất
         var existingUserRoles = await _rbacRepo.GetUserRolesAsync(request.UserId);
         var existingRoleIds = existingUserRoles.Select(ur => ur.RoleId).ToHashSet();
-        var errors = new List<string>();
+    
+        // Dùng Dictionary: Key là ID của Role, Value là thông điệp lỗi
+        var errorMap = new Dictionary<Guid, string>();
 
-        // 2. Check Giao thoa
+        // 1. Check Giao thoa (Return sớm vì đây là lỗi logic request)
         var intersection = request.AddRoleIds?.Intersect(request.RemoveRoleIds ?? new HashSet<Guid>()).ToList();
         if (intersection?.Any() == true)
             return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.duplicate_in_add_and_remove", intersection);
 
-        // 3. Xử lý Xóa
+        // 2. Xử lý Xóa
         if (request.RemoveRoleIds != null)
         {
             foreach (var roleId in request.RemoveRoleIds)
             {
                 var toRemove = existingUserRoles.FirstOrDefault(ur => ur.RoleId == roleId);
-                if (toRemove == null) errors.Add($"Role {roleId} does not exist for user.");
-                else _rbacRepo.Remove(toRemove);
+                if (toRemove == null) 
+                    errorMap[roleId] = "rbac.user_role.not_found_for_removal"; // Key-Value
+                else 
+                    _rbacRepo.Remove(toRemove);
             }
         }
 
-        // 4. Xử lý Thêm
+        // 3. Xử lý Thêm
         if (request.AddRoleIds != null)
         {
             foreach (var roleId in request.AddRoleIds)
             {
-                if (existingRoleIds.Contains(roleId)) errors.Add($"Role {roleId} already assigned to user.");
-                else _rbacRepo.Add(new UserRole { UserId = request.UserId, RoleId = roleId }); 
+                if (existingRoleIds.Contains(roleId)) 
+                    errorMap[roleId] = "rbac.user_role.already_exists"; // Key-Value
+                else 
+                    _rbacRepo.Add(new UserRole { UserId = request.UserId, RoleId = roleId });
             }
         }
 
-        // Nếu có bất kỳ lỗi nào, trả về cả tập hợp lỗi luôn
-        if (errors.Any()) 
-            return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.validate_failed", errors);
+        // Nếu có lỗi, trả về Dictionary lỗi
+        if (errorMap.Any()) 
+            return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.validate_failed", errorMap);
 
-        // 5. Ghi 1 lần duy nhất
+        // 4. Lưu 1 lần duy nhất
         await _rbacRepo.SaveChangesAsync();
 
         return ResponseDto.Create(ResponseCatalog.Success, "rbac.user_role.assign_success");
