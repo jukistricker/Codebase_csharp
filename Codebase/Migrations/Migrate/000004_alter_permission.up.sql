@@ -19,7 +19,8 @@ VALUES
     ('rbac.save_permission', 'Save Permissions', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
     ('rbac.search_permissions', 'Search Permissions', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
     ('rbac.search_permission_groups','Search Permission Groups', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin')),
-    ('auth.view_session','Get Session', (SELECT id FROM public.permission_groups WHERE code = 'user_group'))
+    ('auth.view_session','Get Session', (SELECT id FROM public.permission_groups WHERE code = 'user_group')),
+    ('rbac.assign_role','Assign Roles', (SELECT id FROM public.permission_groups WHERE code = 'rbac_group.admin'))
 
     ON CONFLICT (code) DO UPDATE SET name = EXCLUDED.name;
 
@@ -35,7 +36,8 @@ WHERE p.code IN (
     'rbac.search_roles',
     'rbac.save_permission',
     'rbac.search_permissions',
-    'auth.view_session'
+    'auth.view_session',
+    'rbac.assign_role'
     )
 -- Đảm bảo không chèn trùng nếu bản ghi đã tồn tại
 ON CONFLICT (role_id, permission_id) DO NOTHING;
