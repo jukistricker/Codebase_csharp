@@ -255,14 +255,14 @@ public class RbacService : IRbacService
 
     public async Task<IResult> AssignRoleAsync(UserRoleAssignRequest request)
     {
-        var existingUserRoles = await _rbacRepo.GetUserRolesAsync(request.UserId);
-        var existingRoleIds = existingUserRoles.Select(ur => ur.RoleId).ToHashSet();
+        List<UserRole> existingUserRoles = await _rbacRepo.GetUserRolesAsync(request.UserId);
+        HashSet<Guid> existingRoleIds = existingUserRoles.Select(ur => ur.RoleId).ToHashSet();
     
         // Dùng Dictionary: Key là ID của Role, Value là thông điệp lỗi
-        var errorMap = new Dictionary<Guid, string>();
+        Dictionary<Guid,string> errorMap = new Dictionary<Guid, string>();
 
         // 1. Check Giao thoa (Return sớm vì đây là lỗi logic request)
-        var intersection = request.AddRoleIds?.Intersect(request.RemoveRoleIds ?? new HashSet<Guid>()).ToList();
+        List<Guid>? intersection = request.AddRoleIds?.Intersect(request.RemoveRoleIds ?? new HashSet<Guid>()).ToList();
         if (intersection?.Any() == true)
             return ResponseDto.Create(ResponseCatalog.BadRequest, "rbac.user_role.duplicate_in_add_and_remove", intersection);
 
@@ -271,7 +271,7 @@ public class RbacService : IRbacService
         {
             foreach (var roleId in request.RemoveRoleIds)
             {
-                var toRemove = existingUserRoles.FirstOrDefault(ur => ur.RoleId == roleId);
+                UserRole? toRemove = existingUserRoles.FirstOrDefault(ur => ur.RoleId == roleId);
                 if (toRemove == null) 
                     errorMap[roleId] = "rbac.user_role.not_found_for_removal"; // Key-Value
                 else 
