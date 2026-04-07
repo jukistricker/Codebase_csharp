@@ -35,8 +35,12 @@ builder.Services.AddDbContext<AppDbContext>(opt=>{
 });
 
 // Redis
-builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
-    ConnectionMultiplexer.Connect(builder.Configuration.GetConnectionString("Redis")));
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp => {
+    var connStr = builder.Configuration.GetConnectionString("Redis") ?? builder.Configuration["Redis:ConnectionString"];
+    var options = ConfigurationOptions.Parse(connStr);
+    options.AbortOnConnectFail = false; 
+    return ConnectionMultiplexer.Connect(options);
+});
 
 builder.Services.Configure<ApiBehaviorOptions>(options =>
 {
@@ -197,5 +201,34 @@ app.MapControllers();
 
 app.UseHttpMetrics(); // Theo dõi các yêu cầu HTTP (tùy chọn)
 app.MapMetrics();
+
+// HEALTH CHECK 
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    var db = services.GetRequiredService<AppDbContext>();
+    var logger = services.GetRequiredService<ILogger<Program>>();
+
+    int retry = 0;
+    while (retry < 5) // Thử 5 lần, mỗi lần cách nhau 3s
+    {
+        try {
+            if (await db.Database.CanConnectAsync()) {
+                var authRepo = services.GetRequiredService<IAuthRepository>();
+                var defaultRoleId = await authRepo.GetDefaultRoleIdAsync();
+                if (defaultRoleId.HasValue) {
+                    GlobalCache.DefaultUserRoleId = defaultRoleId.Value;
+                    logger.LogInformation(">>> Connection established and Cache warmed up.");
+                    break;
+                }
+            }
+        } catch {
+            retry++;
+            logger.LogWarning($">>> Waiting for DB... Attempt {retry}/5");
+            await Task.Delay(3000);
+        }
+        if (retry == 5) Environment.Exit(1);
+    }
+}
 
 app.Run();

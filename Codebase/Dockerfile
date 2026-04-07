@@ -2,8 +2,8 @@
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+USER root
 RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-USER $APP_UID
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
@@ -25,26 +25,34 @@ ARG BUILD_CONFIGURATION=Release
 RUN dotnet publish "./Codebase.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
+# Stage final
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS final
-# Cài đặt postgresql-client để có lệnh psql và pg_isready
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-
 WORKDIR /app
-COPY --from=publish /app/publish .
 
-# Chuyển sang root để setup script
+# Chuyển sang root để cài đặt và phân quyền
 USER root
 
-# Copy toàn bộ folder Migrations vào /app/Migrations
-COPY Codebase/Migrations ./Migrations
+# Cài đặt client postgres và bash
+RUN apt-get update && apt-get install -y postgresql-client bash && rm -rf /var/lib/apt/lists/*
 
-# 1. Chuyển đổi định dạng file từ Windows sang Linux (QUAN TRỌNG)
-# 2. Cấp quyền thực thi cho script
-RUN sed -i 's/\r$//' ./Migrations/migrate.sh && \
+# Copy file từ stage publish
+COPY --from=publish /app/publish .
+# Copy folder Migrations
+COPY Codebase/Migrations ./Migrations
+# Copy entrypoint script
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+
+# SỬA LỖI TẠI ĐÂY: Tách biệt các lệnh hoặc dùng && đúng cách
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    sed -i 's/\r$//' ./Migrations/migrate.sh && \
     chmod +x ./Migrations/migrate.sh
 
-# Chuyển lại user của .NET để đảm bảo an toàn (Best Practice)
+# Phân quyền cho user của .NET
+RUN chown -R $APP_UID:$APP_UID /app
+
+# Chuyển về user mặc định để bảo mật
 USER $APP_UID
 
-# Entrypoint thực hiện: Chạy migrate xong mới chạy App
+# Entrypoint thực hiện: Chạy migrate xong mới khởi động app
 ENTRYPOINT ["/bin/bash", "-c", "./Migrations/migrate.sh && dotnet Codebase.dll"]
